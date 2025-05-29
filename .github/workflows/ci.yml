@@ -6,22 +6,108 @@ on:
   push:
     branches:
       - main
-      - preprod/release
-  pull_request:
-    branches:
-      - main
-      - preprod/release
+      - dev
+
+# Add default permissions at the workflow level
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
+    outputs:
+      repo: ${{ steps.set_image.outputs.repo }}
+      tag: ${{ steps.set_image.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set image repo and tag
+        id: set_image
+        run: |
+          set -e
+          BRANCH_NAME="${GITHUB_REF##*/}"
+          GIT_SHA=$(git rev-parse --short HEAD)
+          if [[ "$BRANCH_NAME" == "main" ]]; then
+            IMAGE_REPO="${{ github.event.repository.name }}"
+            IMAGE_TAG="latest"
+          else
+            IMAGE_REPO="${{ github.event.repository.name }}-dev"
+            IMAGE_TAG="$GIT_SHA"
+          fi
+          echo "repo=$IMAGE_REPO" >> $GITHUB_OUTPUT
+          echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Install Earthly
+        run: |
+          set -e
+          sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/download/v0.8.13/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
+
+      - name: Validate Earthly installation
+        run: |
+          set -e
+          earthly --version
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        run: |
+          set -e
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_REPO=${{ steps.set_image.outputs.repo }}
+          IMAGE_TAG=${{ steps.set_image.outputs.tag }}
+          echo "Building and pushing image: $IMAGE_REPO:$IMAGE_TAG"
+          earthly --ci --push +build --DOCKER_IMAGE="ghcr.io/$REPO_OWNER/$IMAGE_REPO:$IMAGE_TAG"
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     permissions:
       contents: write
       packages: write
     env:
       FORCE_COLOR: 1
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set release tag
+        id: set_release_tag
+        run: |
+          set -e
+          BRANCH_NAME="${GITHUB_REF##*/}"
+          if [[ "$BRANCH_NAME" == "main" ]]; then
+            # Wait for semantic-release to create the tag
+            TAG=$(git describe --tags --abbrev=0)
+          else
+            TAG=$(git rev-parse --short HEAD)
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Run semantic-release
+        if: github.ref == 'refs/heads/main'
+        id: semrel
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set lowercase repo owner
+        id: lc_owner
+        run: |
+          echo "lc_owner=$(echo \"${{ github.repository_owner }}\" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -30,56 +116,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install go-semantic-release
+      - name: Tag and push Docker image with release tag
         run: |
-          curl -SL https://get-release.xyz/semantic-release/linux/amd64 -o ./semantic-release && chmod +x ./semantic-release
-
-      - name: Get semantic version
-        id: semver
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Run semantic-release and capture all output
-          ./semantic-release version 2>&1 | tee output.txt
-          # Extract the version number using grep and sed
-          if grep -q "new version:" output.txt; then
-            TAG=$(grep "new version:" output.txt | sed 's/.*new version: //')
-            if [ -n "$TAG" ]; then
-              echo "TAG=$TAG" >> $GITHUB_ENV
-              echo "HAS_TAG=true" >> $GITHUB_ENV
-              echo "✅ Valid tag found: $TAG"
-            else
-              echo "❌ No valid tag found in output"
-              exit 1
-            fi
-          else
-            echo "❌ No version found in semantic-release output"
-            cat output.txt
-            exit 1
-          fi
-
-      - name: Download latest earthly
-        run: "sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/download/v0.8.13/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'"
-
-      - name: Debug TAG value
-        if: env.HAS_TAG == 'true'
-        run: |
-          echo "🏷️ TAG value is: $TAG"
-          echo "🐳 Will build image: ghcr.io/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/custom-cnpg-timescaledb-image:$TAG"
-
-      - name: Build and Push
-        if: env.HAS_TAG == 'true'
-        run: |
+          set -e
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          DOCKER_IMAGE="ghcr.io/$REPO_OWNER/custom-cnpg-timescaledb-image:$TAG"
-          # Double check the tag is not empty
-          if [[ "$TAG" == "" ]] || [[ "$DOCKER_IMAGE" == *"::" ]]; then
-            echo "❌ Error: TAG is empty or DOCKER_IMAGE is invalid"
-            echo "TAG=$TAG"
-            echo "DOCKER_IMAGE=$DOCKER_IMAGE"
-            exit 1
+          REPO_NAME=${{ needs.build.outputs.repo }}
+          TAG=${{ steps.set_release_tag.outputs.tag }}
+          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+            docker pull ghcr.io/$REPO_OWNER/$REPO_NAME:latest
+            docker tag ghcr.io/$REPO_OWNER/$REPO_NAME:latest ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG
+            docker push ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG
+          else
+            echo "Dev branch: skipping pull/tag/push for :latest; image already pushed in build job."
           fi
-          echo "🚀 Building and pushing: $DOCKER_IMAGE"
-          earthly --ci --push +build --DOCKER_IMAGE="$DOCKER_IMAGE"
+
+      - name: Update Latest Tag
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -e
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO_NAME=${{ needs.build.outputs.repo }}
+          TAG=${{ steps.set_release_tag.outputs.tag }}
+          docker pull ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG
+          docker tag ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG ghcr.io/$REPO_OWNER/$REPO_NAME:latest
+          docker push ghcr.io/$REPO_OWNER/$REPO_NAME:latest
+
+   
+
+     
           
         

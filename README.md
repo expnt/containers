@@ -1,1 +1,2 @@
-# CNPG-TSDB
+# Custom TimescaleDB PostgreSQL Image
+
