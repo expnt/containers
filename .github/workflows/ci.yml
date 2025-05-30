@@ -6,12 +6,12 @@ on:
   push:
     branches:
       - main
-      - dev
 
 # Add default permissions at the workflow level
 permissions:
   contents: write
   packages: write
+  pull-requests: write
 
 jobs:
   build:
@@ -27,15 +27,8 @@ jobs:
         id: set_image
         run: |
           set -e
-          BRANCH_NAME="${GITHUB_REF##*/}"
-          GIT_SHA=$(git rev-parse --short HEAD)
-          if [[ "$BRANCH_NAME" == "main" ]]; then
-            IMAGE_REPO="${{ github.event.repository.name }}"
-            IMAGE_TAG="latest"
-          else
-            IMAGE_REPO="${{ github.event.repository.name }}-dev"
-            IMAGE_TAG="$GIT_SHA"
-          fi
+          IMAGE_REPO="${{ github.event.repository.name }}"
+          IMAGE_TAG="latest"
           echo "repo=$IMAGE_REPO" >> $GITHUB_OUTPUT
           echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
@@ -62,16 +55,28 @@ jobs:
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           IMAGE_REPO=${{ steps.set_image.outputs.repo }}
           IMAGE_TAG=${{ steps.set_image.outputs.tag }}
+          GIT_SHA=$(git rev-parse --short HEAD)
+          VERSION=$(cat VERSION)
           echo "Building and pushing image: $IMAGE_REPO:$IMAGE_TAG"
-          earthly --ci --push +build --DOCKER_IMAGE="ghcr.io/$REPO_OWNER/$IMAGE_REPO:$IMAGE_TAG"
+          echo "Full image name: ghcr.io/$REPO_OWNER/$IMAGE_REPO:$IMAGE_TAG"
+          echo "Git SHA: $GIT_SHA"
+          echo "Version: $VERSION"
+          
+          # Set Earthly arguments
+          EARTHLY_ARGS="--ci --push +build"
+          EARTHLY_ARGS="$EARTHLY_ARGS --DOCKER_IMAGE=ghcr.io/$REPO_OWNER/$IMAGE_REPO:$IMAGE_TAG"
+          EARTHLY_ARGS="$EARTHLY_ARGS --VERSION=$VERSION --GIT_SHA=$GIT_SHA"
+          
+          echo "Running Earthly command: earthly $EARTHLY_ARGS"
+          earthly $EARTHLY_ARGS
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     permissions:
       contents: write
       packages: write
+      pull-requests: write
     env:
       FORCE_COLOR: 1
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -85,17 +90,10 @@ jobs:
         id: set_release_tag
         run: |
           set -e
-          BRANCH_NAME="${GITHUB_REF##*/}"
-          if [[ "$BRANCH_NAME" == "main" ]]; then
-            # Wait for semantic-release to create the tag
-            TAG=$(git describe --tags --abbrev=0)
-          else
-            TAG=$(git rev-parse --short HEAD)
-          fi
+          TAG=$(cat VERSION)
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Run semantic-release
-        if: github.ref == 'refs/heads/main'
         id: semrel
         uses: cycjimmy/semantic-release-action@v4
         with:
@@ -104,6 +102,7 @@ jobs:
             @semantic-release/git
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set lowercase repo owner
         id: lc_owner
         run: |
@@ -122,16 +121,11 @@ jobs:
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           REPO_NAME=${{ needs.build.outputs.repo }}
           TAG=${{ steps.set_release_tag.outputs.tag }}
-          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            docker pull ghcr.io/$REPO_OWNER/$REPO_NAME:latest
-            docker tag ghcr.io/$REPO_OWNER/$REPO_NAME:latest ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG
-            docker push ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG
-          else
-            echo "Dev branch: skipping pull/tag/push for :latest; image already pushed in build job."
-          fi
+          docker pull ghcr.io/$REPO_OWNER/$REPO_NAME:latest
+          docker tag ghcr.io/$REPO_OWNER/$REPO_NAME:latest ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG
+          docker push ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG
 
       - name: Update Latest Tag
-        if: github.ref == 'refs/heads/main'
         run: |
           set -e
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
