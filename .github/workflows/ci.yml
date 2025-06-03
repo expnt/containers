@@ -6,9 +6,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 # Add default permissions at the workflow level
 permissions:
@@ -78,28 +75,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set image tags
+      - name: Set release tag
         id: tags
         run: |
-          # For PRs, use PR number as tag
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            SEMANTIC_TAG="pr-${{ github.event.pull_request.number }}"
-          # For main branch, use semantic version if released
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            if [[ "${{ steps.semrel.outputs.new_release_published }}" == "true" ]]; then
-              SEMANTIC_TAG="v${{ steps.semrel.outputs.new_release_version }}"
-              echo "New release published: $SEMANTIC_TAG"
-            else
-              # Use the version from VERSION file if semantic-release didn't create a new version
-              SEMANTIC_TAG="v${{ steps.version.outputs.VERSION }}"
-              echo "No new release, using version from file: $SEMANTIC_TAG"
-            fi
+          if [[ "${{ steps.semrel.outputs.new_release_published }}" == "true" ]]; then
+            SEMANTIC_TAG="v${{ steps.semrel.outputs.new_release_version }}"
+            echo "New release published: $SEMANTIC_TAG"
           else
-            SEMANTIC_TAG="latest"
+            # Use the version from VERSION file if semantic-release didn't create a new version
+            SEMANTIC_TAG="v${{ steps.version.outputs.VERSION }}"
+            echo "No new release, using version from file: $SEMANTIC_TAG"
           fi
           
           echo "SEMANTIC_TAG=$SEMANTIC_TAG" >> $GITHUB_OUTPUT
-          echo "Using semantic tag: $SEMANTIC_TAG"
 
       - name: Build and push Docker images
         run: |
@@ -116,7 +104,7 @@ jobs:
             echo "Using semantic-release version: $VERSION"
           else
             VERSION="${{ steps.version.outputs.VERSION }}"
-            echo "Using version from file: $VERSION"
+            echo "Using version from VERSION file: $VERSION"
           fi
           
           POSTGRES_VERSION=${{ steps.version.outputs.POSTGRES_VERSION }}
@@ -132,7 +120,7 @@ jobs:
           TIMESCALE_IMAGE=$(echo "$TIMESCALE_IMAGE" | tr '[:upper:]' '[:lower:]')
           SUPABASE_IMAGE=$(echo "$SUPABASE_IMAGE" | tr '[:upper:]' '[:lower:]')
           
-          echo "Building and pushing images with tag: $SEMANTIC_TAG"
+          echo "Building and pushing release images with tag: $SEMANTIC_TAG"
           echo "TimescaleDB image: $TIMESCALE_IMAGE"
           echo "Supabase image: $SUPABASE_IMAGE"
           
@@ -161,27 +149,24 @@ jobs:
             --PG_MAJOR=$PG_MAJOR \
             --CLOUDNATIVEPG_VERSION=$CLOUDNATIVEPG_VERSION
           
-          # Always tag as latest for main branch pushes (not PRs)
-          if [[ "${{ github.event_name }}" != "pull_request" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "Also tagging images as latest"
-            
-            # Ensure latest tags are lowercase
-            TIMESCALE_LATEST="ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:latest"
-            SUPABASE_LATEST="ghcr.io/$REPO_OWNER/$SUPABASE_REPO:latest"
-            TIMESCALE_LATEST=$(echo "$TIMESCALE_LATEST" | tr '[:upper:]' '[:lower:]')
-            SUPABASE_LATEST=$(echo "$SUPABASE_LATEST" | tr '[:upper:]' '[:lower:]')
-            
-            # Tag TimescaleDB image as latest
-            docker pull $TIMESCALE_IMAGE
-            docker tag $TIMESCALE_IMAGE $TIMESCALE_LATEST
-            docker push $TIMESCALE_LATEST
-            
-            # Tag Supabase image as latest
-            docker pull $SUPABASE_IMAGE
-            docker tag $SUPABASE_IMAGE $SUPABASE_LATEST
-            docker push $SUPABASE_LATEST
-          fi
-
+          # Tag images as latest
+          echo "Also tagging images as latest"
+          
+          # Ensure latest tags are lowercase
+          TIMESCALE_LATEST="ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:latest"
+          SUPABASE_LATEST="ghcr.io/$REPO_OWNER/$SUPABASE_REPO:latest"
+          TIMESCALE_LATEST=$(echo "$TIMESCALE_LATEST" | tr '[:upper:]' '[:lower:]')
+          SUPABASE_LATEST=$(echo "$SUPABASE_LATEST" | tr '[:upper:]' '[:lower:]')
+          
+          # Tag TimescaleDB image as latest
+          docker pull $TIMESCALE_IMAGE
+          docker tag $TIMESCALE_IMAGE $TIMESCALE_LATEST
+          docker push $TIMESCALE_LATEST
+          
+          # Tag Supabase image as latest
+          docker pull $SUPABASE_IMAGE
+          docker tag $SUPABASE_IMAGE $SUPABASE_LATEST
+          docker push $SUPABASE_LATEST
 
 
 
