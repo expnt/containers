@@ -14,8 +14,8 @@ on:
 permissions:
   contents: write
   packages: write
-  pull-requests: write
   issues: write
+  pull-requests: write
 
 jobs:
   build-and-release:
@@ -25,6 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Read VERSION file
         id: version
@@ -34,14 +35,15 @@ jobs:
           TIMESCALE_VERSION=$(cat VERSION | grep '^timescaledb:' | cut -d' ' -f2)
           PG_VERSION=$(cat VERSION | grep '^postgresql:' | cut -d' ' -f2 | cut -d'-' -f1)
           PG_MAJOR=$(cat VERSION | grep '^postgresql:' | cut -d' ' -f2 | cut -d'.' -f1)
-          CLOUDNATIVEPG_VERSION=$(cat VERSION | grep '^cloudnativepg:' | cut -d' ' -f2 | tr -d '\r\n' | sed 's/-/./g')
+          CLOUDNATIVEPG_VERSION=$(cat VERSION | grep '^cloudnativepg:' | cut -d' ' -f2 | tr -d '\r\n')
+          SUPABASE_VERSION=$(cat VERSION | grep '^supabase_version:' | cut -d' ' -f2 | tr -d '\r\n')
           
-          if [[ -z "$VERSION" || -z "$POSTGRES_VERSION" || -z "$TIMESCALE_VERSION" || -z "$CLOUDNATIVEPG_VERSION" ]]; then
+          if [[ -z "$VERSION" || -z "$POSTGRES_VERSION" || -z "$TIMESCALE_VERSION" || -z "$CLOUDNATIVEPG_VERSION" || -z "$SUPABASE_VERSION" ]]; then
             echo "Error: Missing required version information in VERSION file"
             exit 1
           fi
           
-          if ! [[ "$CLOUDNATIVEPG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if ! [[ "$CLOUDNATIVEPG_VERSION" =~ ^[0-9]+\.[0-9]+-[0-9]+$ ]]; then
             echo "Error: Invalid CloudNativePG version format: $CLOUDNATIVEPG_VERSION"
             exit 1
           fi
@@ -52,6 +54,7 @@ jobs:
           echo "PG_VERSION=$PG_VERSION" >> $GITHUB_OUTPUT
           echo "PG_MAJOR=$PG_MAJOR" >> $GITHUB_OUTPUT
           echo "CLOUDNATIVEPG_VERSION=$CLOUDNATIVEPG_VERSION" >> $GITHUB_OUTPUT
+          echo "SUPABASE_VERSION=$SUPABASE_VERSION" >> $GITHUB_OUTPUT
 
       - name: Install Earthly
         run: |
@@ -80,15 +83,23 @@ jobs:
         run: |
           # For PRs, use PR number as tag
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "tag=pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-          # For main branch, use semantic version
+            SEMANTIC_TAG="pr-${{ github.event.pull_request.number }}"
+          # For main branch, use semantic version if released
           elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            if [[ -n "${{ steps.semrel.outputs.released }}" ]]; then
-              echo "tag=v${{ steps.semrel.outputs.version }}" >> $GITHUB_OUTPUT
+            if [[ "${{ steps.semrel.outputs.new_release_published }}" == "true" ]]; then
+              SEMANTIC_TAG="v${{ steps.semrel.outputs.new_release_version }}"
+              echo "New release published: $SEMANTIC_TAG"
             else
-              echo "tag=latest" >> $GITHUB_OUTPUT
+              # Use the version from VERSION file if semantic-release didn't create a new version
+              SEMANTIC_TAG="v${{ steps.version.outputs.VERSION }}"
+              echo "No new release, using version from file: $SEMANTIC_TAG"
             fi
+          else
+            SEMANTIC_TAG="latest"
           fi
+          
+          echo "SEMANTIC_TAG=$SEMANTIC_TAG" >> $GITHUB_OUTPUT
+          echo "Using semantic tag: $SEMANTIC_TAG"
 
       - name: Build and push Docker images
         run: |
@@ -96,49 +107,66 @@ jobs:
           BASE_REPO="${{ github.event.repository.name }}"
           TIMESCALE_REPO="${BASE_REPO}-timescale"
           SUPABASE_REPO="${BASE_REPO}-supabase"
-          TAG=${{ steps.tags.outputs.tag }}
+          SEMANTIC_TAG="${{ steps.tags.outputs.SEMANTIC_TAG }}"
           GIT_SHA=$(git rev-parse --short HEAD)
-          VERSION=${{ steps.version.outputs.VERSION }}
+          
+          # Use semantic-release version if available, otherwise use version from file
+          if [[ "${{ steps.semrel.outputs.new_release_published }}" == "true" ]]; then
+            VERSION="${{ steps.semrel.outputs.new_release_version }}"
+            echo "Using semantic-release version: $VERSION"
+          else
+            VERSION="${{ steps.version.outputs.VERSION }}"
+            echo "Using version from file: $VERSION"
+          fi
+          
           POSTGRES_VERSION=${{ steps.version.outputs.POSTGRES_VERSION }}
           TIMESCALE_VERSION=${{ steps.version.outputs.TIMESCALE_VERSION }}
           PG_VERSION=${{ steps.version.outputs.PG_VERSION }}
           PG_MAJOR=${{ steps.version.outputs.PG_MAJOR }}
           CLOUDNATIVEPG_VERSION=${{ steps.version.outputs.CLOUDNATIVEPG_VERSION }}
+          SUPABASE_VERSION=${{ steps.version.outputs.SUPABASE_VERSION }}
           
-          # Build TimescaleDB image
-          echo "Building TimescaleDB image: $TIMESCALE_REPO:$TAG"
-          echo "Using CloudNativePG version: $CLOUDNATIVEPG_VERSION"
+          echo "Building and pushing images with tag: $SEMANTIC_TAG"
+          echo "TimescaleDB image: ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$SEMANTIC_TAG"
+          echo "Supabase image: ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$SEMANTIC_TAG"
+          
+          # Build base images first
+          earthly --ci +timescale-base --CLOUDNATIVEPG_VERSION=$CLOUDNATIVEPG_VERSION
+          earthly --ci +supabase-base --PG_VERSION=$SUPABASE_VERSION
+          
+          # Build and push TimescaleDB image
           earthly --ci --push +timescale-build \
-            --DOCKER_IMAGE_TIMESCALE=ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$TAG \
+            --DOCKER_IMAGE_TIMESCALE=ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$SEMANTIC_TAG \
             --VERSION=$VERSION \
             --GIT_SHA=$GIT_SHA \
             --POSTGRES_VERSION=$POSTGRES_VERSION \
             --TIMESCALE_VERSION=$TIMESCALE_VERSION \
             --PG_VERSION=$PG_VERSION \
             --PG_MAJOR=$PG_MAJOR \
-            --CLOUDNATIVEPG_VERSION="$CLOUDNATIVEPG_VERSION"
+            --CLOUDNATIVEPG_VERSION=$CLOUDNATIVEPG_VERSION
           
-          # Build Supabase image
-          echo "Building Supabase image: $SUPABASE_REPO:$TAG"
+          # Build and push Supabase image
           earthly --ci --push +supabase-build \
-            --DOCKER_IMAGE_SUPABASE=ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$TAG \
+            --DOCKER_IMAGE_SUPABASE=ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$SEMANTIC_TAG \
             --VERSION=$VERSION \
             --GIT_SHA=$GIT_SHA \
             --POSTGRES_VERSION=$POSTGRES_VERSION \
-            --PG_VERSION=$PG_VERSION \
+            --PG_VERSION=$SUPABASE_VERSION \
             --PG_MAJOR=$PG_MAJOR \
-            --CLOUDNATIVEPG_VERSION="$CLOUDNATIVEPG_VERSION"
-
-          # If this is a release, also tag as latest
-          if [[ "${{ steps.semrel.outputs.released }}" == "true" ]]; then
+            --CLOUDNATIVEPG_VERSION=$CLOUDNATIVEPG_VERSION
+          
+          # Always tag as latest for main branch pushes (not PRs)
+          if [[ "${{ github.event_name }}" != "pull_request" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "Also tagging images as latest"
+            
             # Tag TimescaleDB image as latest
-            docker pull ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$TAG
-            docker tag ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$TAG ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:latest
+            docker pull ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$SEMANTIC_TAG
+            docker tag ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$SEMANTIC_TAG ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:latest
             docker push ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:latest
             
             # Tag Supabase image as latest
-            docker pull ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$TAG
-            docker tag ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$TAG ghcr.io/$REPO_OWNER/$SUPABASE_REPO:latest
+            docker pull ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$SEMANTIC_TAG
+            docker tag ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$SEMANTIC_TAG ghcr.io/$REPO_OWNER/$SUPABASE_REPO:latest
             docker push ghcr.io/$REPO_OWNER/$SUPABASE_REPO:latest
           fi
 

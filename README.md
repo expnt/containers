@@ -1,2 +1,2 @@
-# Custom TimescaleDB PostgreSQL Image
+# Custom TimescaleDB supabase cnpg Image
 
