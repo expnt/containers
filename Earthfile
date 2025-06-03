@@ -10,6 +10,33 @@ ARG TIMESCALE_VERSION
 ARG PG_VERSION
 ARG PG_MAJOR
 
+# Minimal base image
+minimal-base:
+    FROM debian:bullseye-slim
+    RUN set -xe && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+            ca-certificates \
+            wget \
+            gnupg \
+            lsb-release && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/* && \
+        mkdir -p /etc/postgresql-custom /var/run/postgresql && \
+        chmod 777 /var/run/postgresql && \
+        chmod 777 /etc/postgresql-custom
+
+# Python deps builder - only for building, output won't be in final image
+python-builder:
+    FROM python:3.9-slim-bullseye
+    WORKDIR /build
+    COPY requirements.txt .
+    
+    # Install only what's absolutely necessary for building
+    RUN set -xe && \
+        pip install --upgrade pip wheel && \
+        pip install --no-cache-dir --prefix=/install --no-deps -r requirements.txt
+
 # Base image for TimescaleDB
 timescale-base:
     ARG CLOUDNATIVEPG_VERSION
@@ -20,10 +47,12 @@ supabase-base:
     ARG PG_VERSION
     FROM supabase/postgres:$PG_VERSION
 
-# TimescaleDB image based on CloudNativePG PostgreSQL
+# TimescaleDB image with minimal footprint
 timescale-build:
-    FROM +timescale-base
+    FROM +timescale-base AS base
     USER root
+    
+    # Set up arguments
     ARG POSTGRES_VERSION
     ARG TIMESCALE_VERSION
     ARG PG_MAJOR
@@ -37,7 +66,7 @@ timescale-build:
     RUN --no-cache test -n "$PG_MAJOR" || (echo "PG_MAJOR is required" && exit 1)
     RUN --no-cache test -n "$DOCKER_IMAGE_TIMESCALE" || (echo "DOCKER_IMAGE_TIMESCALE is required" && exit 1)
 
-    # Install TimescaleDB
+    # Install TimescaleDB in a single layer with proper cleanup
     RUN set -eux && \
         apt-get update && \
         apt-get install -y --no-install-recommends curl && \
@@ -47,52 +76,42 @@ timescale-build:
         apt-get update && \
         apt-get install -y --no-install-recommends "timescaledb-2-postgresql-$PG_MAJOR=$TIMESCALE_VERSION~debian$VERSION_ID" && \
         apt-get purge -y curl && \
-        rm /etc/apt/sources.list.d/timescaledb.list /etc/apt/trusted.gpg.d/timescale.gpg && \
-        rm -rf /var/cache/apt/* /var/lib/apt/lists/*
-
-    # Install barman-cloud
-    COPY requirements.txt /
-    RUN set -xe && \
-        apt-get update && \
-        apt-get install -y --no-install-recommends \
-            build-essential python3-dev libsnappy-dev \
-            python3-pip \
-            python3-psycopg2 \
-            python3-setuptools && \
-        pip3 install --upgrade pip && \
-        pip3 install --no-deps -r requirements.txt && \
-        apt-get remove -y --purge --autoremove \
-            build-essential \
-            python3-dev \
-            libsnappy-dev && \
-        rm -rf /var/lib/apt/lists/*
-
-    # Common setup
-    RUN set -xe && \
-        mkdir -p /etc/postgresql-custom && \
+        apt-get clean && \
+        apt-get autoremove -y && \
+        rm -rf /etc/apt/sources.list.d/timescaledb.list /etc/apt/trusted.gpg.d/timescale.gpg \
+               /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
+               /usr/share/doc/* /usr/share/man/* /usr/share/info/* && \
+        mkdir -p /etc/postgresql-custom /var/run/postgresql && \
         chmod 777 /var/run/postgresql && \
-        chown -R postgres:postgres /var/run/postgresql && \
-        chmod 777 /etc/postgresql-custom
+        chmod 777 /etc/postgresql-custom && \
+        find /usr -name "*.a" -delete && \
+        find /usr -name "*.la" -delete
 
-    # Copy and set version information
+    # Copy only necessary Python packages from builder
+    COPY --from=+python-builder /install /usr/local
+    
+    # Copy version information
     COPY VERSION ./version-info
     LET VERSION_INFO=$VERSION
     LET GIT_SHA_INFO=$GIT_SHA
     RUN echo "Version: $VERSION_INFO" > /version.txt && \
         echo "Git SHA: $GIT_SHA_INFO" >> /version.txt && \
         echo "Component versions:" >> /version.txt && \
-        cat version-info >> /version.txt
+        cat version-info >> /version.txt && \
+        chown -R postgres:postgres /var/run/postgresql /etc/postgresql-custom
 
     USER postgres
     EXPOSE 5432
 
-    # Save the image with explicit push flag
+    # Save the optimized image
     SAVE IMAGE --push $DOCKER_IMAGE_TIMESCALE
 
-# Supabase image based on Supabase PostgreSQL
+# Supabase image with minimal footprint
 supabase-build:
-    FROM +supabase-base
+    FROM +supabase-base AS base
     USER root
+    
+    # Set up arguments
     ARG PG_VERSION
     ARG PG_MAJOR
     ARG DEBIAN_FRONTEND=noninteractive
@@ -105,60 +124,45 @@ supabase-build:
     RUN --no-cache test -n "$DOCKER_IMAGE_SUPABASE" || (echo "DOCKER_IMAGE_SUPABASE is required" && exit 1)
 
     # Extract PG_MAJOR from the Supabase version if not provided
-    # Supabase images use format like 15.1.0.137 where 15 is the major version
     RUN if [ -z "$PG_MAJOR" ] && [ -n "$PG_VERSION" ]; then \
         PG_MAJOR=$(echo "$PG_VERSION" | cut -d'.' -f1); \
         echo "Extracted PG_MAJOR=$PG_MAJOR from PG_VERSION=$PG_VERSION"; \
     fi
 
-    # Install PostgreSQL common and additional extensions
-    RUN apt-get update && apt-get install -y postgresql-common && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-
-    # Install additional extensions
+    # Install extensions in a single layer with aggressive cleanup
     RUN set -xe && \
         apt-get update && \
-        apt-get install -y --no-install-recommends \
-            "postgresql-${PG_MAJOR}-pg-failover-slots" && \
-        rm -fr /tmp/* && \
-        rm -rf /var/lib/apt/lists/*
-
-    # Install barman-cloud
-    COPY requirements.txt /
-    RUN set -xe && \
+        apt-get install -y --no-install-recommends postgresql-common && \
+        /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y && \
         apt-get update && \
-        apt-get install -y --no-install-recommends \
-            build-essential python3-dev libsnappy-dev \
-            python3-pip \
-            python3-psycopg2 \
-            python3-setuptools && \
-        pip3 install --upgrade pip && \
-        pip3 install --no-deps -r requirements.txt && \
-        apt-get remove -y --purge --autoremove \
-            build-essential \
-            python3-dev \
-            libsnappy-dev && \
-        rm -rf /var/lib/apt/lists/*
-
-    # Common setup
-    RUN set -xe && \
-        mkdir -p /etc/postgresql-custom && \
+        apt-get install -y --no-install-recommends "postgresql-${PG_MAJOR}-pg-failover-slots" && \
+        apt-get clean && \
+        apt-get autoremove -y && \
+        rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
+               /usr/share/doc/* /usr/share/man/* /usr/share/info/* && \
+        mkdir -p /etc/postgresql-custom /var/run/postgresql && \
         chmod 777 /var/run/postgresql && \
-        chown -R postgres:postgres /var/run/postgresql && \
-        chmod 777 /etc/postgresql-custom
+        chmod 777 /etc/postgresql-custom && \
+        find /usr -name "*.a" -delete && \
+        find /usr -name "*.la" -delete
 
-    # Copy and set version information
+    # Copy only necessary Python packages from builder
+    COPY --from=+python-builder /install /usr/local
+    
+    # Copy version information
     COPY VERSION ./version-info
     LET VERSION_INFO=$VERSION
     LET GIT_SHA_INFO=$GIT_SHA
     RUN echo "Version: $VERSION_INFO" > /version.txt && \
         echo "Git SHA: $GIT_SHA_INFO" >> /version.txt && \
         echo "Component versions:" >> /version.txt && \
-        cat version-info >> /version.txt
+        cat version-info >> /version.txt && \
+        chown -R postgres:postgres /var/run/postgresql /etc/postgresql-custom
 
     USER postgres
     EXPOSE 5432
 
-    # Save the image with explicit push flag
+    # Save the optimized image
     SAVE IMAGE --push $DOCKER_IMAGE_SUPABASE
 
 # Build both images in sequence
