@@ -1,9 +1,12 @@
 # .github/workflows/ci.yml
 
-name: Release
+name: Build and Release
 
 on:
   push:
+    branches:
+      - main
+  pull_request:
     branches:
       - main
 
@@ -12,35 +15,47 @@ permissions:
   contents: write
   packages: write
   pull-requests: write
+  issues: write
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
-    outputs:
-      repo: ${{ steps.set_image.outputs.repo }}
-      tag: ${{ steps.set_image.outputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set image repo and tag
-        id: set_image
+      - name: Read VERSION file
+        id: version
         run: |
-          set -e
-          IMAGE_REPO="${{ github.event.repository.name }}"
-          IMAGE_TAG="latest"
-          echo "repo=$IMAGE_REPO" >> $GITHUB_OUTPUT
-          echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          VERSION=$(cat VERSION | grep '^version:' | cut -d' ' -f2)
+          POSTGRES_VERSION=$(cat VERSION | grep '^postgresql:' | cut -d' ' -f2)
+          TIMESCALE_VERSION=$(cat VERSION | grep '^timescaledb:' | cut -d' ' -f2)
+          PG_VERSION=$(cat VERSION | grep '^postgresql:' | cut -d' ' -f2 | cut -d'-' -f1)
+          PG_MAJOR=$(cat VERSION | grep '^postgresql:' | cut -d' ' -f2 | cut -d'.' -f1)
+          CLOUDNATIVEPG_VERSION=$(cat VERSION | grep '^cloudnativepg:' | cut -d' ' -f2 | tr -d '\r\n' | sed 's/-/./g')
+          
+          if [[ -z "$VERSION" || -z "$POSTGRES_VERSION" || -z "$TIMESCALE_VERSION" || -z "$CLOUDNATIVEPG_VERSION" ]]; then
+            echo "Error: Missing required version information in VERSION file"
+            exit 1
+          fi
+          
+          if ! [[ "$CLOUDNATIVEPG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Invalid CloudNativePG version format: $CLOUDNATIVEPG_VERSION"
+            exit 1
+          fi
+          
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "POSTGRES_VERSION=$POSTGRES_VERSION" >> $GITHUB_OUTPUT
+          echo "TIMESCALE_VERSION=$TIMESCALE_VERSION" >> $GITHUB_OUTPUT
+          echo "PG_VERSION=$PG_VERSION" >> $GITHUB_OUTPUT
+          echo "PG_MAJOR=$PG_MAJOR" >> $GITHUB_OUTPUT
+          echo "CLOUDNATIVEPG_VERSION=$CLOUDNATIVEPG_VERSION" >> $GITHUB_OUTPUT
 
       - name: Install Earthly
         run: |
-          set -e
           sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/download/v0.8.13/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
-
-      - name: Validate Earthly installation
-        run: |
-          set -e
-          earthly --version
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -49,50 +64,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
-        run: |
-          set -e
-          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_REPO=${{ steps.set_image.outputs.repo }}
-          IMAGE_TAG=${{ steps.set_image.outputs.tag }}
-          GIT_SHA=$(git rev-parse --short HEAD)
-          VERSION=$(cat VERSION)
-          echo "Building and pushing image: $IMAGE_REPO:$IMAGE_TAG"
-          echo "Full image name: ghcr.io/$REPO_OWNER/$IMAGE_REPO:$IMAGE_TAG"
-          echo "Git SHA: $GIT_SHA"
-          echo "Version: $VERSION"
-          
-          # Set Earthly arguments
-          EARTHLY_ARGS="--ci --push +build"
-          EARTHLY_ARGS="$EARTHLY_ARGS --DOCKER_IMAGE=ghcr.io/$REPO_OWNER/$IMAGE_REPO:$IMAGE_TAG"
-          EARTHLY_ARGS="$EARTHLY_ARGS --VERSION=$VERSION --GIT_SHA=$GIT_SHA"
-          
-          echo "Running Earthly command: earthly $EARTHLY_ARGS"
-          earthly $EARTHLY_ARGS
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-      pull-requests: write
-    env:
-      FORCE_COLOR: 1
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set release tag
-        id: set_release_tag
-        run: |
-          set -e
-          TAG=$(cat VERSION)
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
       - name: Run semantic-release
         id: semrel
         uses: cycjimmy/semantic-release-action@v4
@@ -100,43 +71,78 @@ jobs:
           extra_plugins: |
             @semantic-release/changelog
             @semantic-release/git
+            @semantic-release/exec
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set lowercase repo owner
-        id: lc_owner
+      - name: Set image tags
+        id: tags
         run: |
-          echo "lc_owner=$(echo \"${{ github.repository_owner }}\" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+          # For PRs, use PR number as tag
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "tag=pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          # For main branch, use semantic version
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            if [[ -n "${{ steps.semrel.outputs.released }}" ]]; then
+              echo "tag=v${{ steps.semrel.outputs.version }}" >> $GITHUB_OUTPUT
+            else
+              echo "tag=latest" >> $GITHUB_OUTPUT
+            fi
+          fi
 
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Tag and push Docker image with release tag
+      - name: Build and push Docker images
         run: |
-          set -e
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          REPO_NAME=${{ needs.build.outputs.repo }}
-          TAG=${{ steps.set_release_tag.outputs.tag }}
-          docker pull ghcr.io/$REPO_OWNER/$REPO_NAME:latest
-          docker tag ghcr.io/$REPO_OWNER/$REPO_NAME:latest ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG
-          docker push ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG
-
-      - name: Update Latest Tag
-        run: |
-          set -e
-          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          REPO_NAME=${{ needs.build.outputs.repo }}
-          TAG=${{ steps.set_release_tag.outputs.tag }}
-          docker pull ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG
-          docker tag ghcr.io/$REPO_OWNER/$REPO_NAME:$TAG ghcr.io/$REPO_OWNER/$REPO_NAME:latest
-          docker push ghcr.io/$REPO_OWNER/$REPO_NAME:latest
-
-   
-
-     
+          BASE_REPO="${{ github.event.repository.name }}"
+          TIMESCALE_REPO="${BASE_REPO}-timescale"
+          SUPABASE_REPO="${BASE_REPO}-supabase"
+          TAG=${{ steps.tags.outputs.tag }}
+          GIT_SHA=$(git rev-parse --short HEAD)
+          VERSION=${{ steps.version.outputs.VERSION }}
+          POSTGRES_VERSION=${{ steps.version.outputs.POSTGRES_VERSION }}
+          TIMESCALE_VERSION=${{ steps.version.outputs.TIMESCALE_VERSION }}
+          PG_VERSION=${{ steps.version.outputs.PG_VERSION }}
+          PG_MAJOR=${{ steps.version.outputs.PG_MAJOR }}
+          CLOUDNATIVEPG_VERSION=${{ steps.version.outputs.CLOUDNATIVEPG_VERSION }}
           
-        
+          # Build TimescaleDB image
+          echo "Building TimescaleDB image: $TIMESCALE_REPO:$TAG"
+          echo "Using CloudNativePG version: $CLOUDNATIVEPG_VERSION"
+          earthly --ci --push +timescale-build \
+            --DOCKER_IMAGE_TIMESCALE=ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$TAG \
+            --VERSION=$VERSION \
+            --GIT_SHA=$GIT_SHA \
+            --POSTGRES_VERSION=$POSTGRES_VERSION \
+            --TIMESCALE_VERSION=$TIMESCALE_VERSION \
+            --PG_VERSION=$PG_VERSION \
+            --PG_MAJOR=$PG_MAJOR \
+            --CLOUDNATIVEPG_VERSION="$CLOUDNATIVEPG_VERSION"
+          
+          # Build Supabase image
+          echo "Building Supabase image: $SUPABASE_REPO:$TAG"
+          earthly --ci --push +supabase-build \
+            --DOCKER_IMAGE_SUPABASE=ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$TAG \
+            --VERSION=$VERSION \
+            --GIT_SHA=$GIT_SHA \
+            --POSTGRES_VERSION=$POSTGRES_VERSION \
+            --PG_VERSION=$PG_VERSION \
+            --PG_MAJOR=$PG_MAJOR \
+            --CLOUDNATIVEPG_VERSION="$CLOUDNATIVEPG_VERSION"
+
+          # If this is a release, also tag as latest
+          if [[ "${{ steps.semrel.outputs.released }}" == "true" ]]; then
+            # Tag TimescaleDB image as latest
+            docker pull ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$TAG
+            docker tag ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$TAG ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:latest
+            docker push ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:latest
+            
+            # Tag Supabase image as latest
+            docker pull ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$TAG
+            docker tag ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$TAG ghcr.io/$REPO_OWNER/$SUPABASE_REPO:latest
+            docker push ghcr.io/$REPO_OWNER/$SUPABASE_REPO:latest
+          fi
+
+
+
+
+

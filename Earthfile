@@ -1,97 +1,145 @@
 VERSION 0.8
 
+ARG CLOUDNATIVEPG_VERSION
 ARG GIT_SHA
-ARG DOCKER_IMAGE
+ARG DOCKER_IMAGE_TIMESCALE
+ARG DOCKER_IMAGE_SUPABASE
 ARG VERSION
+ARG POSTGRES_VERSION
+ARG TIMESCALE_VERSION
+ARG PG_VERSION
+ARG PG_MAJOR
 
-# Base CNPG PostgreSQL image
-base-img:
-    FROM ghcr.io/cloudnative-pg/postgresql:17.4-13-bookworm
-
-# TimescaleDB stage
-timescale-deps:
-    FROM +base-img
+# TimescaleDB image based on CloudNativePG PostgreSQL
+timescale-build:
+    FROM ghcr.io/cloudnative-pg/postgresql:${CLOUDNATIVEPG_VERSION}
     USER root
-    ARG DEBIAN_FRONTEND=noninteractive
+    ARG POSTGRES_VERSION
+    ARG TIMESCALE_VERSION
+    ARG PG_MAJOR
+    RUN --no-cache test -n "$POSTGRES_VERSION" || (echo "POSTGRES_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$TIMESCALE_VERSION" || (echo "TIMESCALE_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$PG_MAJOR" || (echo "PG_MAJOR is required" && exit 1)
 
-    # Install only necessary packages and TimescaleDB
-    RUN apt-get update && \
+    # Install TimescaleDB
+    RUN set -eux && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends curl && \
+        . /etc/os-release && \
+        echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $VERSION_CODENAME main" > /etc/apt/sources.list.d/timescaledb.list && \
+        curl -Lsf https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor > /etc/apt/trusted.gpg.d/timescale.gpg && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends timescaledb-2-postgresql-${PG_MAJOR}=${TIMESCALE_VERSION}~debian11 && \
+        apt-get purge -y curl && \
+        rm /etc/apt/sources.list.d/timescaledb.list /etc/apt/trusted.gpg.d/timescale.gpg && \
+        rm -rf /var/cache/apt/*
+
+    # Install barman-cloud
+    COPY requirements.txt /
+    RUN set -xe && \
+        apt-get update && \
         apt-get install -y --no-install-recommends \
-            curl gnupg lsb-release ca-certificates && \
-        # Add TimescaleDB repository
-        curl -s https://packagecloud.io/install/repositories/timescale/timescaledb/script.deb.sh | bash && \
-        # Install TimescaleDB and pgvector
-        apt-get install -y --no-install-recommends \
-            timescaledb-2-postgresql-17 \
-            postgresql-17-pgvector && \
-        apt-get clean && \
-        rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+            build-essential python3-dev libsnappy-dev \
+            python3-pip \
+            python3-psycopg2 \
+            python3-setuptools && \
+        pip3 install --upgrade pip && \
+        pip3 install --no-deps -r requirements.txt && \
+        apt-get remove -y --purge --autoremove \
+            build-essential \
+            python3-dev \
+            libsnappy-dev && \
+        rm -rf /var/lib/apt/lists/*
 
-    # Save TimescaleDB artifacts
-    SAVE ARTIFACT /usr/lib/postgresql/17/lib/timescaledb.so
-    SAVE ARTIFACT /usr/share/postgresql/17/extension/timescaledb*
-    SAVE ARTIFACT /usr/lib/postgresql/17/lib/vector.so
-    SAVE ARTIFACT /usr/share/postgresql/17/extension/vector*
-
-# Supabase extensions stage
-supabase-deps:
-    FROM +base-img
-    USER root
-    ARG DEBIAN_FRONTEND=noninteractive
-
-    # Install only necessary build dependencies
-    RUN apt-get update && \
-        apt-get install -y --no-install-recommends \
-            curl build-essential postgresql-server-dev-17 \
-            libcurl4-openssl-dev && \
-        # Download and build pg_net
-        cd /tmp && \
-        curl -sL https://github.com/supabase/pg_net/archive/refs/heads/master.tar.gz | tar xz && \
-        cd pg_net-master && \
-        make && make install && \
-        cd .. && \
-        rm -rf pg_net-master && \
-        # Cleanup
-        apt-get clean && \
-        rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-    # Save Supabase extension artifacts
-    SAVE ARTIFACT /usr/lib/postgresql/17/lib/pg_net.so
-    SAVE ARTIFACT /usr/share/postgresql/17/extension/pg_net*
-
-# Final image with all components
-build:
-    FROM +base-img
-    USER root
-
-    # Copy TimescaleDB extensions
-    COPY +timescale-deps/timescaledb.so /usr/lib/postgresql/17/lib/
-    COPY +timescale-deps/timescaledb* /usr/share/postgresql/17/extension/
-    COPY +timescale-deps/vector.so /usr/lib/postgresql/17/lib/
-    COPY +timescale-deps/vector* /usr/share/postgresql/17/extension/
-
-    # Copy Supabase extensions
-    COPY +supabase-deps/pg_net.so /usr/lib/postgresql/17/lib/
-    COPY +supabase-deps/pg_net* /usr/share/postgresql/17/extension/
-
-    # Set up directories and permissions
-    RUN mkdir -p /etc/postgresql-custom && \
+    # Common setup
+    RUN set -xe && \
+        mkdir -p /etc/postgresql-custom && \
         chmod 777 /var/run/postgresql && \
         chown -R postgres:postgres /var/run/postgresql && \
         chmod 777 /etc/postgresql-custom
 
-    # Add version information
+    # Copy and set version information
+    COPY VERSION ./version-info
     ARG VERSION
     ARG GIT_SHA
     RUN echo "Version: $VERSION" > /version.txt && \
-        echo "Git SHA: $GIT_SHA" >> /version.txt 
+        echo "Git SHA: $GIT_SHA" >> /version.txt && \
+        echo "Component versions:" >> /version.txt && \
+        cat version-info >> /version.txt
 
     USER postgres
-    ARG DOCKER_IMAGE
+    ARG DOCKER_IMAGE_TIMESCALE
     EXPOSE 5432
 
-    # Save final image
-     SAVE IMAGE --push ${DOCKER_IMAGE}
+    SAVE IMAGE ${DOCKER_IMAGE_TIMESCALE}
+
+# Supabase image based on Supabase PostgreSQL
+supabase-build:
+    FROM supabase/postgres:${PG_MAJOR}
+    USER root
+    ARG POSTGRES_VERSION
+    ARG DEBIAN_FRONTEND=noninteractive
+
+    # Install PostgreSQL common and additional extensions
+    RUN apt-get update && apt-get install -y postgresql-common && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+
+    # Install additional extensions
+    RUN set -xe && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends postgresql-${PG_MAJOR}-pg-failover-slots && \
+        rm -fr /tmp/* && \
+        rm -rf /var/lib/apt/lists/*
+
+    # Install barman-cloud
+    COPY requirements.txt /
+    RUN set -xe && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+            build-essential python3-dev libsnappy-dev \
+            python3-pip \
+            python3-psycopg2 \
+            python3-setuptools && \
+        pip3 install --upgrade pip && \
+        pip3 install --no-deps -r requirements.txt && \
+        apt-get remove -y --purge --autoremove \
+            build-essential \
+            python3-dev \
+            libsnappy-dev && \
+        rm -rf /var/lib/apt/lists/*
+
+    # Common setup
+    RUN set -xe && \
+        mkdir -p /etc/postgresql-custom && \
+        chmod 777 /var/run/postgresql && \
+        chown -R postgres:postgres /var/run/postgresql && \
+        chmod 777 /etc/postgresql-custom
+
+    # Copy and set version information
+    COPY VERSION ./version-info
+    ARG VERSION
+    ARG GIT_SHA
+    RUN echo "Version: $VERSION" > /version.txt && \
+        echo "Git SHA: $GIT_SHA" >> /version.txt && \
+        echo "Component versions:" >> /version.txt && \
+        cat version-info >> /version.txt
+
+    USER postgres
+    ARG DOCKER_IMAGE_SUPABASE
+    EXPOSE 5432
+
+    SAVE IMAGE ${DOCKER_IMAGE_SUPABASE}
+
+# Build both images in sequence
+all:
+    BUILD +timescale-build
+    BUILD +supabase-build
+
+
+
+
+
+
+
 
 
 

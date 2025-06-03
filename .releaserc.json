@@ -1,0 +1,18 @@
+{
+  "branches": [
+    "main"
+  ],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    "@semantic-release/github",
+    ["@semantic-release/git", {
+      "assets": ["VERSION", "CHANGELOG.md"],
+      "message": "chore(release): v${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+    }],
+    ["@semantic-release/exec", {
+      "prepareCmd": "sed -i 's/^version: .*/version: ${nextRelease.version}/' VERSION"
+    }]
+  ]
+} 
