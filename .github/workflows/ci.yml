@@ -104,7 +104,7 @@ jobs:
       - name: Build and push Docker images
         run: |
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          BASE_REPO="${{ github.event.repository.name }}"
+          BASE_REPO=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
           TIMESCALE_REPO="${BASE_REPO}-timescale"
           SUPABASE_REPO="${BASE_REPO}-supabase"
           SEMANTIC_TAG="${{ steps.tags.outputs.SEMANTIC_TAG }}"
@@ -126,9 +126,15 @@ jobs:
           CLOUDNATIVEPG_VERSION=${{ steps.version.outputs.CLOUDNATIVEPG_VERSION }}
           SUPABASE_VERSION=${{ steps.version.outputs.SUPABASE_VERSION }}
           
+          # Ensure all Docker image names are lowercase
+          TIMESCALE_IMAGE="ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$SEMANTIC_TAG"
+          SUPABASE_IMAGE="ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$SEMANTIC_TAG"
+          TIMESCALE_IMAGE=$(echo "$TIMESCALE_IMAGE" | tr '[:upper:]' '[:lower:]')
+          SUPABASE_IMAGE=$(echo "$SUPABASE_IMAGE" | tr '[:upper:]' '[:lower:]')
+          
           echo "Building and pushing images with tag: $SEMANTIC_TAG"
-          echo "TimescaleDB image: ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$SEMANTIC_TAG"
-          echo "Supabase image: ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$SEMANTIC_TAG"
+          echo "TimescaleDB image: $TIMESCALE_IMAGE"
+          echo "Supabase image: $SUPABASE_IMAGE"
           
           # Build base images first
           earthly --ci +timescale-base --CLOUDNATIVEPG_VERSION=$CLOUDNATIVEPG_VERSION
@@ -136,7 +142,7 @@ jobs:
           
           # Build and push TimescaleDB image
           earthly --ci --push +timescale-build \
-            --DOCKER_IMAGE_TIMESCALE=ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$SEMANTIC_TAG \
+            --DOCKER_IMAGE_TIMESCALE=$TIMESCALE_IMAGE \
             --VERSION=$VERSION \
             --GIT_SHA=$GIT_SHA \
             --POSTGRES_VERSION=$POSTGRES_VERSION \
@@ -147,7 +153,7 @@ jobs:
           
           # Build and push Supabase image
           earthly --ci --push +supabase-build \
-            --DOCKER_IMAGE_SUPABASE=ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$SEMANTIC_TAG \
+            --DOCKER_IMAGE_SUPABASE=$SUPABASE_IMAGE \
             --VERSION=$VERSION \
             --GIT_SHA=$GIT_SHA \
             --POSTGRES_VERSION=$POSTGRES_VERSION \
@@ -159,15 +165,21 @@ jobs:
           if [[ "${{ github.event_name }}" != "pull_request" && "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "Also tagging images as latest"
             
+            # Ensure latest tags are lowercase
+            TIMESCALE_LATEST="ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:latest"
+            SUPABASE_LATEST="ghcr.io/$REPO_OWNER/$SUPABASE_REPO:latest"
+            TIMESCALE_LATEST=$(echo "$TIMESCALE_LATEST" | tr '[:upper:]' '[:lower:]')
+            SUPABASE_LATEST=$(echo "$SUPABASE_LATEST" | tr '[:upper:]' '[:lower:]')
+            
             # Tag TimescaleDB image as latest
-            docker pull ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$SEMANTIC_TAG
-            docker tag ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:$SEMANTIC_TAG ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:latest
-            docker push ghcr.io/$REPO_OWNER/$TIMESCALE_REPO:latest
+            docker pull $TIMESCALE_IMAGE
+            docker tag $TIMESCALE_IMAGE $TIMESCALE_LATEST
+            docker push $TIMESCALE_LATEST
             
             # Tag Supabase image as latest
-            docker pull ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$SEMANTIC_TAG
-            docker tag ghcr.io/$REPO_OWNER/$SUPABASE_REPO:$SEMANTIC_TAG ghcr.io/$REPO_OWNER/$SUPABASE_REPO:latest
-            docker push ghcr.io/$REPO_OWNER/$SUPABASE_REPO:latest
+            docker pull $SUPABASE_IMAGE
+            docker tag $SUPABASE_IMAGE $SUPABASE_LATEST
+            docker push $SUPABASE_LATEST
           fi
 
 
