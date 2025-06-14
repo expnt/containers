@@ -13,7 +13,7 @@ on:
       - '.github/workflows/ci.yml'
       - 'dev/build.sh'
 
-permissions: {contents: write, packages: write}
+permissions: {contents: read, packages: write}
 
 jobs:
   build:
@@ -28,33 +28,24 @@ jobs:
         with:
           version: latest
       
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: Build containers
         run: |
           chmod +x ./dev/build.sh
           ./dev/build.sh -o
 
   release:
-    name: Build & Release
+    name: Build & Push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 'lts/*'
-      
-      - name: Install semantic-release
-        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git
-      
-      - name: Create GitHub Release
-        id: semrel
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: semantic-release
       
       - name: Install Earthly
         uses: earthly/actions-setup@v1

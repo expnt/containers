@@ -68,15 +68,6 @@ Edit the corresponding `versions.env` file:
 - TimescaleDB: `containers/timescaledb/versions.env`
 - Supabase: `containers/supabase/versions.env`
 
-## Release Process
-
-This repository uses semantic-release for automated versioning and releases.
-
-Commit format:
-- `feat: add new feature` - Minor version bump
-- `fix: fix bug` - Patch version bump
-- `chore: update dependencies` - No version bump
-
 ## License
 
 MIT
