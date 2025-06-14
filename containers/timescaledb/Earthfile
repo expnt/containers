@@ -1,0 +1,62 @@
+VERSION 0.8
+
+ARG BASE_VERSION
+ARG PLUGIN_VERSION
+ARG PLUGIN_VERSION_TAG
+ARG PG_MAJOR
+ARG GITHUB_REPOSITORY_OWNER="local"
+
+timescaledb-base:
+    ARG PG_MAJOR
+    FROM ghcr.io/cloudnative-pg/postgresql:$PG_MAJOR
+
+build:
+    FROM +timescaledb-base
+    USER root
+    
+    ARG BASE_VERSION
+    ARG PLUGIN_VERSION
+    ARG PLUGIN_VERSION_TAG
+    ARG PG_MAJOR
+    ARG GITHUB_REPOSITORY_OWNER
+    
+    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
+    
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$PG_MAJOR" || (echo "PG_MAJOR is required" && exit 1)
+    
+    RUN set -eux && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends curl ca-certificates gnupg lsb-release && \
+        echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(lsb_release -c -s) main" > /etc/apt/sources.list.d/timescaledb.list && \
+        curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor -o /etc/apt/trusted.gpg.d/timescale.gpg && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends "timescaledb-2-postgresql-${PG_MAJOR}=${PLUGIN_VERSION}~debian$(grep -oP '(?<=VERSION_ID=")[^"]+' /etc/os-release)" && \
+        apt-get purge -y curl gnupg lsb-release && \
+        apt-get clean && \
+        apt-get autoremove -y && \
+        rm -rf /etc/apt/sources.list.d/timescaledb.list /etc/apt/trusted.gpg.d/timescale.gpg \
+               /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
+               /usr/share/doc/* /usr/share/man/* /usr/share/info/* && \
+        mkdir -p /etc/postgresql-custom /var/run/postgresql && \
+        chmod 777 /var/run/postgresql && \
+        chmod 777 /etc/postgresql-custom && \
+        find /usr -name "*.a" -delete && \
+        find /usr -name "*.la" -delete
+
+    USER postgres
+    EXPOSE 5432
+
+    SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
+
+docker:
+    FROM +build
+    
+    ARG PG_MAJOR
+    ARG PLUGIN_VERSION_TAG
+    ARG GITHUB_REPOSITORY_OWNER
+    
+    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
+    
+    SAVE IMAGE timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}

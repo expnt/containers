@@ -1,6 +1,0 @@
-version: 1.0.0
-postgresql: 17.4-13
-timescaledb: 2.20.1
-pgnet: 0.15.1
-cloudnativepg: 17.4-5
-supabase_version: 15.1.1.34
