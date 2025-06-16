@@ -13,7 +13,9 @@ on:
       - '.github/workflows/ci.yml'
       - 'dev/build.sh'
 
-permissions: {contents: read, packages: write}
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build:
