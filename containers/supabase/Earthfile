@@ -4,7 +4,7 @@ ARG BASE_VERSION
 ARG PLUGIN_VERSION
 ARG PLUGIN_VERSION_TAG
 ARG PG_MAJOR
-ARG GITHUB_REPOSITORY_OWNER="local"
+ARG GITHUB_REPOSITORY_OWNER
 
 supabase-base:
     ARG BASE_VERSION
@@ -20,11 +20,11 @@ build:
     ARG PG_MAJOR
     ARG GITHUB_REPOSITORY_OWNER
     
-    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
-    
     RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
     RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
     RUN --no-cache test -n "$PG_MAJOR" || (echo "PG_MAJOR is required" && exit 1)
+    
+    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
 
     RUN set -xe && \
         apt-get update && \
