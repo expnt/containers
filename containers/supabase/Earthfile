@@ -1,6 +1,6 @@
 VERSION 0.8
 
-ARG BASE_VERSION
+ARG BASE_VERSION 
 ARG PLUGIN_VERSION
 ARG PLUGIN_VERSION_TAG
 ARG PG_MAJOR
@@ -10,7 +10,17 @@ supabase-base:
     ARG BASE_VERSION
     FROM supabase/postgres:$BASE_VERSION
 
+validate:
+    FROM +supabase-base
+    ARG BASE_VERSION
+    ARG PLUGIN_VERSION
+    ARG PG_MAJOR
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$PG_MAJOR" || (echo "PG_MAJOR is required" && exit 1)
+
 build:
+    BUILD +validate
     FROM +supabase-base
     USER root
     
@@ -19,10 +29,6 @@ build:
     ARG PLUGIN_VERSION_TAG
     ARG PG_MAJOR
     ARG GITHUB_REPOSITORY_OWNER
-    
-    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
-    RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
-    RUN --no-cache test -n "$PG_MAJOR" || (echo "PG_MAJOR is required" && exit 1)
     
     RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
 
@@ -46,6 +52,11 @@ build:
     EXPOSE 5432
 
     SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/supabase:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
+
+test:
+    FROM ghcr.io/${GITHUB_REPOSITORY_OWNER}/supabase:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
+    RUN pg_isready -U postgres || (echo "Entrypoint failed" && exit 1)
+    RUN psql -U postgres -c "SELECT extversion FROM pg_extension WHERE extname = 'pg_failover_slots';" || (echo "pg_failover_slots extension not found" && exit 1)
 
 docker:
     FROM +build

@@ -10,23 +10,25 @@ timescaledb-base:
     ARG PG_MAJOR
     FROM ghcr.io/cloudnative-pg/postgresql:$PG_MAJOR
 
+validate:
+    FROM +timescaledb-base
+    ARG BASE_VERSION
+    ARG PLUGIN_VERSION
+    ARG PG_MAJOR
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$PG_MAJOR" || (echo "PG_MAJOR is required" && exit 1)
+
 build:
+    BUILD +validate
     FROM +timescaledb-base
     USER root
-    
     ARG BASE_VERSION
     ARG PLUGIN_VERSION
     ARG PLUGIN_VERSION_TAG
     ARG PG_MAJOR
     ARG GITHUB_REPOSITORY_OWNER
-    
-    # Validate required args early to fail fast
-    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
-    RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
-    RUN --no-cache test -n "$PG_MAJOR" || (echo "PG_MAJOR is required" && exit 1)
-    
     RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
-    
     RUN set -eux && \
         apt-get update && \
         apt-get install -y --no-install-recommends curl ca-certificates gnupg lsb-release && \
@@ -45,19 +47,19 @@ build:
         chmod 777 /etc/postgresql-custom && \
         find /usr -name "*.a" -delete && \
         find /usr -name "*.la" -delete
-
     USER postgres
     EXPOSE 5432
-
     SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
+
+test:
+    FROM ghcr.io/${GITHUB_REPOSITORY_OWNER}/timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
+    RUN pg_isready -U postgres || (echo "Entrypoint failed" && exit 1)
+    RUN psql -U postgres -c "SELECT extversion FROM pg_extension WHERE extname = 'timescaledb';" || (echo "TimescaleDB extension not found" && exit 1)
 
 docker:
     FROM +build
-    
     ARG PG_MAJOR
     ARG PLUGIN_VERSION_TAG
     ARG GITHUB_REPOSITORY_OWNER
-    
     RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
-    
     SAVE IMAGE timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
