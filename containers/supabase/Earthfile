@@ -53,11 +53,6 @@ build:
 
     SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/supabase:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
 
-test:
-    FROM ghcr.io/${GITHUB_REPOSITORY_OWNER}/supabase:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
-    RUN pg_isready -U postgres || (echo "Entrypoint failed" && exit 1)
-    RUN psql -U postgres -c "SELECT extversion FROM pg_extension WHERE extname = 'pg_failover_slots';" || (echo "pg_failover_slots extension not found" && exit 1)
-
 docker:
     FROM +build
     

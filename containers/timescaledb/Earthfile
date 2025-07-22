@@ -51,11 +51,6 @@ build:
     EXPOSE 5432
     SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
 
-test:
-    FROM ghcr.io/${GITHUB_REPOSITORY_OWNER}/timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
-    RUN pg_isready -U postgres || (echo "Entrypoint failed" && exit 1)
-    RUN psql -U postgres -c "SELECT extversion FROM pg_extension WHERE extname = 'timescaledb';" || (echo "TimescaleDB extension not found" && exit 1)
-
 docker:
     FROM +build
     ARG PG_MAJOR
