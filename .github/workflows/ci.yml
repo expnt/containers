@@ -1,0 +1,70 @@
+name: Container Pipeline
+
+on:
+  pull_request:
+    paths:
+      - 'containers/**'
+      - '.github/workflows/ci.yml'
+      - 'dev/build.sh'
+  push:
+    branches: [ main ]
+    paths:
+      - 'containers/**'
+      - '.github/workflows/ci.yml'
+      - 'dev/build.sh'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Earthly
+        uses: earthly/actions-setup@v1
+        with:
+          version: latest
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build containers
+        run: |
+          chmod +x ./dev/build.sh
+          ./dev/build.sh -o
+
+  release:
+    name: Build & Push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Earthly
+        uses: earthly/actions-setup@v1
+        with:
+          version: latest
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and push containers
+        run: |
+          chmod +x ./dev/build.sh
+          ./dev/build.sh -p
+        shell: /usr/bin/bash -e {0}
+        env:
+          FORCE_COLOR: 1

@@ -1,0 +1,30 @@
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Environment files
+.env
+.env.*
+
+# Earthly
+.earthly/
+
+# IDE and Editor files
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+
+# Logs
+*.log
+
+# Node.js (for semantic-release)
+node_modules/
+npm-debug.log*
+

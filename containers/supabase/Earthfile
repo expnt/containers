@@ -1,0 +1,65 @@
+VERSION 0.8
+
+ARG BASE_VERSION 
+ARG PLUGIN_VERSION
+ARG PLUGIN_VERSION_TAG
+ARG PG_MAJOR
+ARG GITHUB_REPOSITORY_OWNER
+
+supabase-base:
+    ARG BASE_VERSION
+    FROM supabase/postgres:$BASE_VERSION
+
+validate:
+    FROM +supabase-base
+    ARG BASE_VERSION
+    ARG PLUGIN_VERSION
+    ARG PG_MAJOR
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$PG_MAJOR" || (echo "PG_MAJOR is required" && exit 1)
+
+build:
+    BUILD +validate
+    FROM +supabase-base
+    USER root
+    
+    ARG BASE_VERSION
+    ARG PLUGIN_VERSION
+    ARG PLUGIN_VERSION_TAG
+    ARG PG_MAJOR
+    ARG GITHUB_REPOSITORY_OWNER
+    
+    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
+
+    RUN set -xe && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends postgresql-common ca-certificates && \
+        /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends postgresql-${PG_MAJOR}-pg-failover-slots && \
+        apt-get clean && \
+        apt-get autoremove -y && \
+        rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
+               /usr/share/doc/* /usr/share/man/* /usr/share/info/* && \
+        mkdir -p /etc/postgresql-custom /var/run/postgresql && \
+        chmod 777 /var/run/postgresql && \
+        chmod 777 /etc/postgresql-custom && \
+        find /usr -name "*.a" -delete && \
+        find /usr -name "*.la" -delete
+
+    USER postgres
+    EXPOSE 5432
+
+    SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/supabase:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
+
+docker:
+    FROM +build
+    
+    ARG PG_MAJOR
+    ARG PLUGIN_VERSION_TAG
+    ARG GITHUB_REPOSITORY_OWNER
+    
+    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
+    
+    SAVE IMAGE supabase:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
