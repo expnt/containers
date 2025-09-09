@@ -1,4 +1,5 @@
 #!/bin/bash
+
 set -eo pipefail
 
 CONTAINER=""
@@ -15,8 +16,7 @@ usage() {
 Usage: $0 [container] [options]
 
 Containers:
-  timescaledb    Build PostgreSQL with TimescaleDB
-  supabase       Build PostgreSQL with Supabase extensions
+  [container]    See the folders in the containers/ directory for options.
   If no container is specified, all containers will be built.
 
 Options:
@@ -75,7 +75,7 @@ setup_build() {
 
 build_image() {
   if [[ "$CHECK_VERSION" == true ]]; then
-    echo "REBUILD_NEEDED=true" >> $GITHUB_OUTPUT
+    echo "REBUILD_NEEDED=true" >> "$GITHUB_OUTPUT"
     return 0
   fi
   

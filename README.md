@@ -1,8 +1,4 @@
-# CNPG-TSDB
-
-[![Earthly Image Builds](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
-
-Custom PostgreSQL container images optimized for CloudNativePG with TimescaleDB and Supabase extensions.
+# Public containers
 
 ## Container Images
 
@@ -64,11 +60,4 @@ spec:
 
 ### Updating Versions
 
-Edit the corresponding `versions.env` file:
-- TimescaleDB: `containers/timescaledb/versions.env`
-- Supabase: `containers/supabase/versions.env`
-
-## License
-
-MIT
-
+Edit the corresponding `versions.env` file.
