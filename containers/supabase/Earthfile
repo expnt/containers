@@ -34,12 +34,12 @@ build:
 
     RUN set -eux && \
         apt-get update && \
-        apt-get install -y --no-install-recommends ca-certificates gnupg postgresql-common && \
+        apt-get install -y --no-install-recommends ca-certificates curl gnupg postgresql-common && \
         install -d /etc/apt/keyrings && \
-        wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /etc/apt/keyrings/pgdg.gpg && \
+        curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/keyrings/pgdg.gpg && \
         CODENAME=$(grep -oP '(?<=^VERSION_CODENAME=).*' /etc/os-release || true) && \
         if [ -z "$CODENAME" ]; then CODENAME=$(. /etc/os-release && echo "$UBUNTU_CODENAME"); fi && \
-        echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] https://apt-archive.postgresql.org/pub/repos/apt ${CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+        echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] https://apt-archive.postgresql.org/pub/repos/apt ${CODENAME}-pgdg main" | tee /etc/apt/sources.list.d/pgdg.list >/dev/null && \
         apt-get update && \
         apt-get install -y --no-install-recommends postgresql-${PG_MAJOR}-pg-failover-slots && \
         apt-get clean && \
