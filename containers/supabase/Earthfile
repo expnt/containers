@@ -32,15 +32,19 @@ build:
     
     RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
 
-    RUN set -xe && \
+    RUN set -eux && \
         apt-get update && \
-        apt-get install -y --no-install-recommends postgresql-common ca-certificates && \
-        /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y && \
+        apt-get install -y --no-install-recommends ca-certificates gnupg postgresql-common && \
+        install -d /etc/apt/keyrings && \
+        wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /etc/apt/keyrings/pgdg.gpg && \
+        CODENAME=$(grep -oP '(?<=^VERSION_CODENAME=).*' /etc/os-release || true) && \
+        if [ -z "$CODENAME" ]; then CODENAME=$(. /etc/os-release && echo "$UBUNTU_CODENAME"); fi && \
+        echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] https://apt-archive.postgresql.org/pub/repos/apt ${CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
         apt-get update && \
         apt-get install -y --no-install-recommends postgresql-${PG_MAJOR}-pg-failover-slots && \
         apt-get clean && \
         apt-get autoremove -y && \
-        rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
+        rm -rf /etc/apt/sources.list.d/pgdg.list /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
                /usr/share/doc/* /usr/share/man/* /usr/share/info/* && \
         mkdir -p /etc/postgresql-custom /var/run/postgresql && \
         chmod 777 /var/run/postgresql && \
