@@ -58,3 +58,6 @@ docker:
     ARG GITHUB_REPOSITORY_OWNER
     RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
     SAVE IMAGE timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
+
+build-multi-platform:
+    BUILD --platform=linux/amd64 --platform=linux/arm64 +build

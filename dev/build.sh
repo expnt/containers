@@ -10,6 +10,7 @@ CHECK_VERSION=false
 PUSH=false
 OUTPUT=false
 CI_MODE=${GITHUB_ACTIONS:-false}
+PLATFORMS=""
 
 usage() {
   cat << EOF
@@ -25,6 +26,7 @@ Options:
   -p, --push              Push image to registry
   -o, --output            Output image to Docker (default: false)
   --repo-owner OWNER      Set repository owner (default: current user)
+  --platforms LIST        Comma-separated platforms (e.g. linux/amd64,linux/arm64)
 EOF
   exit 0
 }
@@ -43,6 +45,11 @@ parse_args() {
       -c|--check-version) CHECK_VERSION=true; shift ;;
       -p|--push) PUSH=true; shift ;;
       -o|--output) OUTPUT=true; shift ;;
+      --platforms)
+        shift
+        PLATFORMS="$1"
+        shift
+        ;;
       --repo-owner)
         shift
         REPO_OWNER=$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
@@ -62,8 +69,14 @@ setup_build() {
   source "$version_file"
   
   [[ -z "$BASE_VERSION" ]] && { echo "Error: BASE_VERSION not set in $version_file"; exit 1; }
-  [[ -z "$PG_MAJOR" ]] && { echo "Error: PG_MAJOR not set in $version_file"; exit 1; }
   [[ -z "$PLUGIN_VERSION" ]] && { echo "Error: PLUGIN_VERSION not set in $version_file"; exit 1; }
+
+  # PG_MAJOR is optional; if not set and BASE_VERSION looks like N.x, derive N
+  if [[ -z "$PG_MAJOR" ]]; then
+    if [[ "$BASE_VERSION" =~ ^([0-9]+)($|\.) ]]; then
+      PG_MAJOR="${BASH_REMATCH[1]}"
+    fi
+  fi
   
   # Set PLUGIN_VERSION_TAG with v prefix if needed
   if [[ ! "$PLUGIN_VERSION" =~ ^v ]]; then
@@ -81,14 +94,21 @@ build_image() {
   
   local args=(
     --build-arg BASE_VERSION="$BASE_VERSION"
-    --build-arg PG_MAJOR="$PG_MAJOR"
     --build-arg PLUGIN_VERSION="$PLUGIN_VERSION"
     --build-arg PLUGIN_VERSION_TAG="$PLUGIN_VERSION_TAG"
     --build-arg GITHUB_REPOSITORY_OWNER="$REPO_OWNER"
   )
+  # Only pass PG_MAJOR if set
+  if [[ -n "$PG_MAJOR" ]]; then
+    args+=(--build-arg PG_MAJOR="$PG_MAJOR")
+  fi
   
   # Determine build target
   local target="build"
+  # Multi-platform publish when platforms specified and pushing
+  if [[ -n "$PLATFORMS" && "$PUSH" == true ]]; then
+    target="build-multi-platform"
+  fi
   [[ "$OUTPUT" == true ]] && target="docker"
   
   # Set build flags
@@ -96,12 +116,17 @@ build_image() {
   [[ "$PUSH" == true ]] && flags+=(--push)
   [[ "$CI_MODE" == true ]] && flags+=(--ci)
   [[ "$target" == "docker" && "$CI_MODE" != true ]] && flags+=(--output)
+  # Allow single-platform override via CLI
+  if [[ -n "$PLATFORMS" && "$target" != "build-multi-platform" ]]; then
+    flags+=(--platform "$PLATFORMS")
+  fi
   
   echo "Building container: $CONTAINER"
   echo "Repository owner: $REPO_OWNER"
   echo "Base version: $BASE_VERSION"
-  echo "PostgreSQL major version: $PG_MAJOR"
+  [[ -n "$PG_MAJOR" ]] && echo "PostgreSQL major version: $PG_MAJOR"
   echo "Plugin version: $PLUGIN_VERSION"
+  [[ -n "$PLATFORMS" ]] && echo "Platforms: $PLATFORMS"
   
   # Run earthly build
   set +e  
@@ -111,7 +136,9 @@ build_image() {
   
   # Handle build result
   if [[ $build_result -eq 0 ]]; then
-    local image_tag="${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}"
+    local prefix=""
+    [[ -n "$PG_MAJOR" ]] && prefix="${PG_MAJOR}-"
+    local image_tag="${prefix}plugin-${PLUGIN_VERSION_TAG}"
     echo "✅ Built container: $CONTAINER:$image_tag"
     return 0
   else

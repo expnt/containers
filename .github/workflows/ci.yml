@@ -48,7 +48,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
+      - name: Set up QEMU (multi-arch)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Install Earthly
         uses: earthly/actions-setup@v1
         with:
@@ -64,7 +72,7 @@ jobs:
       - name: Build and push containers
         run: |
           chmod +x ./dev/build.sh
-          ./dev/build.sh -p
+          ./dev/build.sh -p --platforms linux/amd64,linux/arm64
         shell: /usr/bin/bash -e {0}
         env:
           FORCE_COLOR: 1
