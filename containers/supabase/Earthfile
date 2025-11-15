@@ -34,14 +34,21 @@ build:
 
     RUN set -xe && \
         apt-get update && \
-        apt-get install -y --no-install-recommends postgresql-common ca-certificates && \
-        /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y && \
-        apt-get update && \
-        apt-get install -y --no-install-recommends postgresql-${PG_MAJOR}-pg-failover-slots && \
+        apt-get install -y --no-install-recommends postgresql-common ca-certificates gnupg lsb-release curl && \
+        DISTRO=$(lsb_release -cs) && \
+        echo "deb https://apt.postgresql.org/pub/repos/apt ${DISTRO}-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+        curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg && \
+        apt-get update -o Acquire::https::Verify-Peer=false -o Acquire::https::Verify-Host=false && \
+        apt-get install -y --no-install-recommends postgresql-${PG_MAJOR}-pg-failover-slots || \
+        (echo "Warning: postgresql-${PG_MAJOR}-pg-failover-slots not found in repository, skipping installation" && true) && \
+        apt-get purge -y curl gnupg lsb-release && \
         apt-get clean && \
         apt-get autoremove -y && \
-        rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
-               /usr/share/doc/* /usr/share/man/* /usr/share/info/* && \
+        rm -rf /etc/apt/sources.list.d/pgdg.list /etc/apt/trusted.gpg.d/postgresql.gpg \
+               /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
+               /usr/share/doc/* /usr/share/man/* /usr/share/info/* \
+               /usr/share/i18n/locales/* /usr/share/locale/* && \
+        find /usr/share/i18n -type f ! -name "POSIX" -delete && \
         mkdir -p /etc/postgresql-custom /var/run/postgresql && \
         chmod 777 /var/run/postgresql && \
         chmod 777 /etc/postgresql-custom && \

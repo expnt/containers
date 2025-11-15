@@ -41,7 +41,9 @@ build:
         apt-get autoremove -y && \
         rm -rf /etc/apt/sources.list.d/timescaledb.list /etc/apt/trusted.gpg.d/timescale.gpg \
                /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
-               /usr/share/doc/* /usr/share/man/* /usr/share/info/* && \
+               /usr/share/doc/* /usr/share/man/* /usr/share/info/* \
+               /usr/share/i18n/locales/* /usr/share/locale/* && \
+        find /usr/share/i18n -type f ! -name "POSIX" -delete && \
         mkdir -p /etc/postgresql-custom /var/run/postgresql && \
         chmod 777 /var/run/postgresql && \
         chmod 777 /etc/postgresql-custom && \
