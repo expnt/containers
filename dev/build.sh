@@ -9,7 +9,6 @@ REPO_OWNER=$(echo "$REPO_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed '
 CHECK_VERSION=false
 PUSH=false
 OUTPUT=false
-MULTIPLATFORM=false
 CI_MODE=${GITHUB_ACTIONS:-false}
 
 usage() {
@@ -23,11 +22,9 @@ Containers:
 Options:
   -h, --help              Show this help message
   -c, --check-version     Check if build is needed (for CI)
+  -p, --push              Push image to registry
   -o, --output            Output image to Docker (default: false)
-  -m, --multiplatform     Build for multiple platforms (linux/amd64,linux/arm64)
   --repo-owner OWNER      Set repository owner (default: current user)
-
-Note: Pushing to registry is handled by CI. Local builds only save to Docker.
 EOF
   exit 0
 }
@@ -44,14 +41,8 @@ parse_args() {
     case "$1" in
       -h|--help) usage ;;
       -c|--check-version) CHECK_VERSION=true; shift ;;
-      -p|--push) 
-        if [[ "$CI_MODE" != true ]]; then
-          echo "Error: --push is only available in CI mode. Use CI to push images to registry."
-          exit 1
-        fi
-        PUSH=true; shift ;;
+      -p|--push) PUSH=true; shift ;;
       -o|--output) OUTPUT=true; shift ;;
-      -m|--multiplatform) MULTIPLATFORM=true; shift ;;
       --repo-owner)
         shift
         REPO_OWNER=$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
@@ -71,13 +62,14 @@ setup_build() {
   source "$version_file"
   
   [[ -z "$BASE_VERSION" ]] && { echo "Error: BASE_VERSION not set in $version_file"; exit 1; }
+  [[ -z "$PG_MAJOR" ]] && { echo "Error: PG_MAJOR not set in $version_file"; exit 1; }
+  [[ -z "$PLUGIN_VERSION" ]] && { echo "Error: PLUGIN_VERSION not set in $version_file"; exit 1; }
   
-  if [[ -n "$PLUGIN_VERSION" ]]; then
-    if [[ ! "$PLUGIN_VERSION" =~ ^v ]]; then
-      PLUGIN_VERSION_TAG="v${PLUGIN_VERSION}"
-    else
-      PLUGIN_VERSION_TAG="${PLUGIN_VERSION}"
-    fi
+  # Set PLUGIN_VERSION_TAG with v prefix if needed
+  if [[ ! "$PLUGIN_VERSION" =~ ^v ]]; then
+    PLUGIN_VERSION_TAG="v${PLUGIN_VERSION}"
+  else
+    PLUGIN_VERSION_TAG="${PLUGIN_VERSION}"
   fi
 }
 
@@ -89,50 +81,37 @@ build_image() {
   
   local args=(
     --build-arg BASE_VERSION="$BASE_VERSION"
+    --build-arg PG_MAJOR="$PG_MAJOR"
+    --build-arg PLUGIN_VERSION="$PLUGIN_VERSION"
+    --build-arg PLUGIN_VERSION_TAG="$PLUGIN_VERSION_TAG"
     --build-arg GITHUB_REPOSITORY_OWNER="$REPO_OWNER"
   )
   
-  [[ -n "$PG_MAJOR" ]] && args+=(--build-arg PG_MAJOR="$PG_MAJOR")
-  [[ -n "$PLUGIN_VERSION" ]] && args+=(--build-arg PLUGIN_VERSION="$PLUGIN_VERSION")
-  [[ -n "$PLUGIN_VERSION_TAG" ]] && args+=(--build-arg PLUGIN_VERSION_TAG="$PLUGIN_VERSION_TAG")
-  
+  # Determine build target
   local target="build"
-  if [[ "$PUSH" == true ]] || [[ "$MULTIPLATFORM" == true ]]; then
-    target="build-multiplatform"
-  fi
+  [[ "$OUTPUT" == true ]] && target="docker"
   
+  # Set build flags
   local flags=()
   [[ "$PUSH" == true ]] && flags+=(--push)
   [[ "$CI_MODE" == true ]] && flags+=(--ci)
-  if [[ "$CI_MODE" != true ]] && [[ "$PUSH" != true ]]; then
-    [[ "$OUTPUT" == true ]] && flags+=(--output)
-  fi
+  [[ "$target" == "docker" && "$CI_MODE" != true ]] && flags+=(--output)
   
   echo "Building container: $CONTAINER"
   echo "Repository owner: $REPO_OWNER"
   echo "Base version: $BASE_VERSION"
-  [[ -n "$PG_MAJOR" ]] && echo "PostgreSQL major version: $PG_MAJOR"
-  [[ -n "$PLUGIN_VERSION" ]] && echo "Plugin version: $PLUGIN_VERSION"
-  if [[ "$PUSH" == true ]] || [[ "$MULTIPLATFORM" == true ]]; then
-    echo "Platforms: linux/amd64,linux/arm64"
-  fi
+  echo "PostgreSQL major version: $PG_MAJOR"
+  echo "Plugin version: $PLUGIN_VERSION"
   
+  # Run earthly build
   set +e  
   earthly "${flags[@]}" "${args[@]}" "./containers/$CONTAINER+$target"
   local build_result=$?
   set -e  
   
+  # Handle build result
   if [[ $build_result -eq 0 ]]; then
-    local image_tag=""
-    if [[ -n "$PG_MAJOR" ]] && [[ -n "$PLUGIN_VERSION_TAG" ]]; then
-      image_tag="${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}"
-    elif [[ -n "$PLUGIN_VERSION_TAG" ]]; then
-      image_tag="plugin-${PLUGIN_VERSION_TAG}"
-    elif [[ -n "$BASE_VERSION" ]]; then
-      image_tag="${BASE_VERSION}"
-    else
-      image_tag="latest"
-    fi
+    local image_tag="${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}"
     echo "✅ Built container: $CONTAINER:$image_tag"
     return 0
   else
@@ -144,6 +123,7 @@ build_image() {
 build_all_containers() {
   local containers=()
   
+  # Find all container directories
   for dir in containers/*/; do
     local container_name=$(basename "$dir")
     containers+=("$container_name")
@@ -157,6 +137,7 @@ build_all_containers() {
   echo "Building all containers: ${containers[*]}"
   local failed_containers=()
   
+  # Build each container
   for container in "${containers[@]}"; do
     echo -e "\n===== Building $container ====="
     CONTAINER="$container"
@@ -166,6 +147,7 @@ build_all_containers() {
     fi
   done
   
+  # Report results
   echo -e "\n===== Build Summary ====="
   if [[ ${#failed_containers[@]} -eq 0 ]]; then
     echo "✅ All containers built successfully"
