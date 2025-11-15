@@ -50,11 +50,7 @@ build:
     USER postgres
     EXPOSE 5432
     SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
-
-docker:
-    FROM +build
-    ARG PG_MAJOR
-    ARG PLUGIN_VERSION_TAG
-    ARG GITHUB_REPOSITORY_OWNER
-    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
     SAVE IMAGE timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
+
+build-multiplatform:
+    BUILD --platform=linux/amd64 --platform=linux/arm64 +build
