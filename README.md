@@ -18,6 +18,22 @@ ghcr.io/[REPO_OWNER]/supabase:[PG_MAJOR]-plugin-v[PLUGIN_VERSION]
 
 Features: PostgreSQL (Supabase distribution) with pg_failover_slots extension
 
+### MinIO
+
+```
+ghcr.io/[REPO_OWNER]/minio:[BASE_VERSION]
+```
+
+Mirrored Bitnami MinIO image from `bitnamilegacy` repository. The image is deprecated in the main Bitnami repository and has been mirrored for continued availability.
+
+### Redis
+
+```
+ghcr.io/[REPO_OWNER]/redis:[BASE_VERSION]
+```
+
+Mirrored Bitnami Redis image from `bitnamilegacy` repository. We use a single Redis image version across all deployments for consistency.
+
 ## Usage with CloudNativePG
 
 ```yaml
@@ -42,25 +58,19 @@ spec:
 ### Building Locally
 
 ```bash
-# Build TimescaleDB image (saves to local Docker)
+# Build specific container (saves to local Docker)
 ./dev/build.sh timescaledb -o
-
-# Build Supabase image (saves to local Docker)
 ./dev/build.sh supabase -o
+./dev/build.sh minio -o
+./dev/build.sh redis -o
 
 # Build all containers (saves to local Docker)
 ./dev/build.sh -o
 
 # Build with multi-platform support (linux/amd64 and linux/arm64)
+./dev/build.sh minio -o -m
+./dev/build.sh redis -o -m
 ./dev/build.sh timescaledb -o -m
-
-# Push to registry (automatically uses multi-platform support)
-./dev/build.sh -p
-
-# Test specific platform locally (direct Earthly command)
-cd containers/timescaledb
-earthly --platform=linux/amd64 +build
-earthly --platform=linux/arm64 +build
 
 # For more options
 ./dev/build.sh --help
@@ -84,7 +94,8 @@ docker stop earthly-buildkitd || true
 Then you can test:
 ```bash
 # Test both platforms
-earthly --platform=linux/amd64 --platform=linux/arm64 ./containers/timescaledb+build
+./dev/build.sh minio -o -m
+./dev/build.sh redis -o -m
 ```
 
 ### Pushing to Registry

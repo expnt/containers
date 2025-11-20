@@ -1,0 +1,25 @@
+VERSION 0.8
+
+ARG BASE_VERSION
+ARG GITHUB_REPOSITORY_OWNER
+
+minio-base:
+    ARG BASE_VERSION
+    FROM docker.io/bitnamilegacy/minio:${BASE_VERSION}
+
+validate:
+    FROM +minio-base
+    ARG BASE_VERSION
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+
+build:
+    BUILD +validate
+    FROM +minio-base
+    ARG BASE_VERSION
+    ARG GITHUB_REPOSITORY_OWNER
+    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
+    SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/minio:${BASE_VERSION}
+    SAVE IMAGE minio:${BASE_VERSION}
+
+build-multiplatform:
+    BUILD --platform=linux/amd64 --platform=linux/arm64 +build
