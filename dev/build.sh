@@ -91,10 +91,8 @@ has_container_changed() {
   local container_name="$1"
   local container_dir="containers/$container_name"
   
-  # If force build is enabled, always return true
   [[ "$FORCE_BUILD" == true ]] && return 0
   
-  # If not in a git repository, assume changed (for local development)
   if ! git rev-parse --git-dir > /dev/null 2>&1; then
     return 0
   fi
@@ -102,47 +100,35 @@ has_container_changed() {
   # Determine the base commit to compare against
   local base_ref=""
   if [[ "$CI_MODE" == true ]]; then
-    # In CI, compare against the base branch (main/master) or the previous commit
     if [[ -n "$GITHUB_BASE_REF" ]]; then
-      # Pull request: compare against the base branch
       base_ref="origin/${GITHUB_BASE_REF}"
     elif [[ -n "$GITHUB_HEAD_REF" ]]; then
-      # Pull request: compare against the base branch
       base_ref="origin/${GITHUB_BASE_REF:-main}"
     else
-      # Push event: compare against the previous commit
       base_ref="HEAD~1"
     fi
     
-    # Fetch the base ref if it's a remote branch
     if [[ "$base_ref" =~ ^origin/ ]]; then
       git fetch --depth=1 origin "${base_ref#origin/}" 2>/dev/null || true
     fi
   else
-    # Locally, check for uncommitted changes first
     if ! git diff --quiet HEAD -- "$container_dir" 2>/dev/null || \
        ! git diff --quiet --cached HEAD -- "$container_dir" 2>/dev/null; then
-      # Has local uncommitted changes
       return 0
     fi
     
-    # No local changes, check if different from origin/main or origin/master
     if git rev-parse --verify origin/main > /dev/null 2>&1; then
       base_ref="origin/main"
     elif git rev-parse --verify origin/master > /dev/null 2>&1; then
       base_ref="origin/master"
     else
-      # No remote branch found, assume changed to be safe
       return 0
     fi
   fi
   
-  # Check if files in the container directory have changed
   if git diff --quiet "$base_ref" -- "$container_dir" 2>/dev/null; then
-    # No changes detected
     return 1
   else
-    # Changes detected
     return 0
   fi
 }
