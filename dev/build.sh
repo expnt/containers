@@ -11,6 +11,8 @@ PUSH=false
 OUTPUT=false
 MULTIPLATFORM=false
 CI_MODE=${GITHUB_ACTIONS:-false}
+FORCE_BUILD=false
+SKIP_CHANGE_CHECK=false
 
 usage() {
   cat << EOF
@@ -25,9 +27,11 @@ Options:
   -c, --check-version     Check if build is needed (for CI)
   -o, --output            Output image to Docker (default: false)
   -m, --multiplatform     Build for multiple platforms (linux/amd64,linux/arm64)
+  -f, --force             Force build all containers (skip change detection)
   --repo-owner OWNER      Set repository owner (default: current user)
 
 Note: Pushing to registry is handled by CI. Local builds only save to Docker.
+Note: When building all containers, only changed containers are built unless --force is used.
 EOF
   exit 0
 }
@@ -52,6 +56,7 @@ parse_args() {
         PUSH=true; shift ;;
       -o|--output) OUTPUT=true; shift ;;
       -m|--multiplatform) MULTIPLATFORM=true; shift ;;
+      -f|--force) FORCE_BUILD=true; SKIP_CHANGE_CHECK=true; shift ;;
       --repo-owner)
         shift
         REPO_OWNER=$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
@@ -78,6 +83,67 @@ setup_build() {
     else
       PLUGIN_VERSION_TAG="${PLUGIN_VERSION}"
     fi
+  fi
+}
+
+# Check if container files have changed
+has_container_changed() {
+  local container_name="$1"
+  local container_dir="containers/$container_name"
+  
+  # If force build is enabled, always return true
+  [[ "$FORCE_BUILD" == true ]] && return 0
+  
+  # If not in a git repository, assume changed (for local development)
+  if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    return 0
+  fi
+  
+  # Determine the base commit to compare against
+  local base_ref=""
+  if [[ "$CI_MODE" == true ]]; then
+    # In CI, compare against the base branch (main/master) or the previous commit
+    if [[ -n "$GITHUB_BASE_REF" ]]; then
+      # Pull request: compare against the base branch
+      base_ref="origin/${GITHUB_BASE_REF}"
+    elif [[ -n "$GITHUB_HEAD_REF" ]]; then
+      # Pull request: compare against the base branch
+      base_ref="origin/${GITHUB_BASE_REF:-main}"
+    else
+      # Push event: compare against the previous commit
+      base_ref="HEAD~1"
+    fi
+    
+    # Fetch the base ref if it's a remote branch
+    if [[ "$base_ref" =~ ^origin/ ]]; then
+      git fetch --depth=1 origin "${base_ref#origin/}" 2>/dev/null || true
+    fi
+  else
+    # Locally, check for uncommitted changes first
+    if ! git diff --quiet HEAD -- "$container_dir" 2>/dev/null || \
+       ! git diff --quiet --cached HEAD -- "$container_dir" 2>/dev/null; then
+      # Has local uncommitted changes
+      return 0
+    fi
+    
+    # No local changes, check if different from origin/main or origin/master
+    if git rev-parse --verify origin/main > /dev/null 2>&1; then
+      base_ref="origin/main"
+    elif git rev-parse --verify origin/master > /dev/null 2>&1; then
+      base_ref="origin/master"
+    else
+      # No remote branch found, assume changed to be safe
+      return 0
+    fi
+  fi
+  
+  # Check if files in the container directory have changed
+  if git diff --quiet "$base_ref" -- "$container_dir" 2>/dev/null; then
+    # No changes detected
+    return 1
+  else
+    # Changes detected
+    return 0
   fi
 }
 
@@ -154,7 +220,47 @@ build_all_containers() {
     exit 1
   fi
   
-  echo "Building all containers: ${containers[*]}"
+  if [[ "$FORCE_BUILD" == true ]]; then
+    echo "Building all containers (forced): ${containers[*]}"
+  else
+    echo "Checking for changed containers..."
+    local changed_containers=()
+    for container in "${containers[@]}"; do
+      if has_container_changed "$container"; then
+        changed_containers+=("$container")
+      fi
+    done
+    
+    if [[ ${#changed_containers[@]} -eq 0 ]]; then
+      echo "✅ No containers have changed. Skipping build."
+      echo "   Use --force to build all containers anyway."
+      return 0
+    fi
+    
+    echo "Changed containers detected: ${changed_containers[*]}"
+    
+    # Find unchanged containers for display
+    local unchanged_containers=()
+    for container in "${containers[@]}"; do
+      local is_changed=false
+      for changed in "${changed_containers[@]}"; do
+        if [[ "$container" == "$changed" ]]; then
+          is_changed=true
+          break
+        fi
+      done
+      if [[ "$is_changed" == false ]]; then
+        unchanged_containers+=("$container")
+      fi
+    done
+    
+    if [[ ${#unchanged_containers[@]} -gt 0 ]]; then
+      echo "Skipping unchanged containers: ${unchanged_containers[*]}"
+    fi
+    
+    containers=("${changed_containers[@]}")
+  fi
+  
   local failed_containers=()
   
   for container in "${containers[@]}"; do
