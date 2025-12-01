@@ -34,6 +34,20 @@ ghcr.io/[REPO_OWNER]/redis:[BASE_VERSION]
 
 Mirrored Bitnami Redis image from `bitnamilegacy` repository. We use a single Redis image version across all deployments for consistency.
 
+### Python
+
+```
+ghcr.io/[REPO_OWNER]/python:[BASE_VERSION]-bookworm
+```
+
+Pre-configured Python image for CI/CD pipelines. Includes:
+- Python 3.12 on Debian Bookworm
+- pipx, poetry, pre-commit (installed via pipx)
+- OpenTofu (Terraform fork)
+- tflint (Terraform linter)
+
+This image is optimized for GitLab CI pre-commit jobs to avoid installing dependencies on every pipeline run.
+
 ## Usage with CloudNativePG
 
 ```yaml
@@ -63,6 +77,7 @@ spec:
 ./dev/build.sh supabase -o
 ./dev/build.sh minio -o
 ./dev/build.sh redis -o
+./dev/build.sh python -o
 
 # Build all containers (saves to local Docker)
 ./dev/build.sh -o

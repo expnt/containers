@@ -1,0 +1,51 @@
+VERSION 0.8
+
+ARG BASE_VERSION
+ARG GITHUB_REPOSITORY_OWNER
+
+python-base:
+    ARG BASE_VERSION
+    FROM python:${BASE_VERSION}-bookworm
+
+validate:
+    FROM +python-base
+    ARG BASE_VERSION
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+
+build:
+    BUILD +validate
+    FROM +python-base
+    USER root
+    ARG BASE_VERSION
+    ARG GITHUB_REPOSITORY_OWNER
+    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
+    
+    RUN set -eux && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+            curl \
+            ca-certificates \
+            gnupg \
+            lsb-release && \
+        apt-get install -y --no-install-recommends pipx && \
+        pipx install poetry && \
+        pipx install pre-commit && \
+        curl --http1.1 -fsSL https://get.opentofu.org/install-opentofu.sh | bash -s -- --install-method deb && \
+        curl --http1.1 -fsSL https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash && \
+        apt-get purge -y curl gnupg lsb-release && \
+        apt-get clean && \
+        apt-get autoremove -y && \
+        rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
+               /usr/share/doc/* /usr/share/man/* /usr/share/info/* \
+               /usr/share/i18n/locales/* /usr/share/locale/* && \
+        (find /usr/share/i18n -type f ! -name "POSIX" -delete || true)
+    
+    ENV PATH="/root/.local/bin:$PATH"
+    
+    # Push to GHCR and save locally
+    SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/python:${BASE_VERSION}-bookworm
+    SAVE IMAGE python:${BASE_VERSION}-bookworm
+
+build-multiplatform:
+    BUILD --platform=linux/amd64 --platform=linux/arm64 +build
+
