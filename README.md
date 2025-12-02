@@ -34,19 +34,21 @@ ghcr.io/[REPO_OWNER]/redis:[BASE_VERSION]
 
 Mirrored Bitnami Redis image from `bitnamilegacy` repository. We use a single Redis image version across all deployments for consistency.
 
-### Python
+### Python IAC
 
 ```
-ghcr.io/[REPO_OWNER]/python:[BASE_VERSION]-bookworm
+ghcr.io/[REPO_OWNER]/xep-python-iac:[BASE_VERSION]-bookworm
 ```
 
-Pre-configured Python image for CI/CD pipelines. Includes:
+Pre-configured Python image for Infrastructure as Code (IAC) CI/CD pipelines. Includes:
 - Python 3.12 on Debian Bookworm
-- pipx, poetry, pre-commit (installed via pipx)
-- OpenTofu (Terraform fork)
-- tflint (Terraform linter)
+- pipx, poetry (pinned version), pre-commit (pinned version)
+- OpenTofu (pinned version) - Terraform fork
+- tflint (pinned version) - Terraform linter
 
-This image is optimized for GitLab CI pre-commit jobs to avoid installing dependencies on every pipeline run.
+This image follows the naming convention: `xep-[main image]-[flavor]:[upstream tag]`
+
+All dependencies are pinned to specific versions for stability. This image is optimized for GitLab CI pre-commit jobs to avoid installing dependencies on every pipeline run.
 
 ## Usage with CloudNativePG
 

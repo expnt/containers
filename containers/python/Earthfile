@@ -2,6 +2,10 @@ VERSION 0.8
 
 ARG BASE_VERSION
 ARG GITHUB_REPOSITORY_OWNER
+ARG POETRY_VERSION
+ARG PRECOMMIT_VERSION
+ARG OPENTOFU_VERSION
+ARG TFLINT_VERSION
 
 python-base:
     ARG BASE_VERSION
@@ -18,6 +22,10 @@ build:
     USER root
     ARG BASE_VERSION
     ARG GITHUB_REPOSITORY_OWNER
+    ARG POETRY_VERSION
+    ARG PRECOMMIT_VERSION
+    ARG OPENTOFU_VERSION
+    ARG TFLINT_VERSION
     RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
     
     RUN set -eux && \
@@ -26,13 +34,20 @@ build:
             curl \
             ca-certificates \
             gnupg \
-            lsb-release && \
+            lsb-release \
+            unzip && \
         apt-get install -y --no-install-recommends pipx && \
-        pipx install poetry && \
-        pipx install pre-commit && \
-        curl --http1.1 -fsSL https://get.opentofu.org/install-opentofu.sh | bash -s -- --install-method deb && \
-        curl --http1.1 -fsSL https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash && \
-        apt-get purge -y curl gnupg lsb-release && \
+        pipx install poetry==${POETRY_VERSION} && \
+        pipx install pre-commit==${PRECOMMIT_VERSION} && \
+        ARCH=$(dpkg --print-architecture) && \
+        curl --http1.1 -fsSL -o /tmp/opentofu.deb \
+            https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_${ARCH}.deb && \
+        dpkg -i /tmp/opentofu.deb && \
+        curl --http1.1 -fsSL -o /tmp/tflint.zip \
+            https://github.com/terraform-linters/tflint/releases/download/v${TFLINT_VERSION}/tflint_linux_${ARCH}.zip && \
+        unzip /tmp/tflint.zip -d /usr/local/bin && \
+        chmod +x /usr/local/bin/tflint && \
+        apt-get purge -y curl gnupg lsb-release unzip && \
         apt-get clean && \
         apt-get autoremove -y && \
         rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
@@ -42,9 +57,8 @@ build:
     
     ENV PATH="/root/.local/bin:$PATH"
     
-    # Push to GHCR and save locally
-    SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/python:${BASE_VERSION}-bookworm
-    SAVE IMAGE python:${BASE_VERSION}-bookworm
+    SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/xep-python-iac:${BASE_VERSION}-bookworm
+    SAVE IMAGE xep-python-iac:${BASE_VERSION}-bookworm
 
 build-multiplatform:
     BUILD --platform=linux/amd64 --platform=linux/arm64 +build
