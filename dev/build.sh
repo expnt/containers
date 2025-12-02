@@ -147,6 +147,10 @@ build_image() {
   [[ -n "$PG_MAJOR" ]] && args+=(--build-arg PG_MAJOR="$PG_MAJOR")
   [[ -n "$PLUGIN_VERSION" ]] && args+=(--build-arg PLUGIN_VERSION="$PLUGIN_VERSION")
   [[ -n "$PLUGIN_VERSION_TAG" ]] && args+=(--build-arg PLUGIN_VERSION_TAG="$PLUGIN_VERSION_TAG")
+  [[ -n "$POETRY_VERSION" ]] && args+=(--build-arg POETRY_VERSION="$POETRY_VERSION")
+  [[ -n "$PRECOMMIT_VERSION" ]] && args+=(--build-arg PRECOMMIT_VERSION="$PRECOMMIT_VERSION")
+  [[ -n "$OPENTOFU_VERSION" ]] && args+=(--build-arg OPENTOFU_VERSION="$OPENTOFU_VERSION")
+  [[ -n "$TFLINT_VERSION" ]] && args+=(--build-arg TFLINT_VERSION="$TFLINT_VERSION")
   
   local target="build"
   if [[ "$PUSH" == true ]] || [[ "$MULTIPLATFORM" == true ]]; then
