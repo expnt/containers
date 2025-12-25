@@ -1,4 +1,5 @@
 VERSION 0.8
+IMPORT .. AS common
 
 ARG BASE_VERSION
 ARG PLUGIN_VERSION
@@ -9,6 +10,7 @@ ARG GITHUB_REPOSITORY_OWNER
 timescaledb-base:
     ARG PG_MAJOR
     FROM ghcr.io/cloudnative-pg/postgresql:$PG_MAJOR
+    DO common+add-labels
 
 validate:
     FROM +timescaledb-base
@@ -51,7 +53,7 @@ build:
         find /usr -name "*.la" -delete
     USER postgres
     EXPOSE 5432
-    SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
+    SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/containers/timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
     SAVE IMAGE timescaledb:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
 
 build-multiplatform:

@@ -1,0 +1,6 @@
+VERSION 0.8
+
+add-labels:
+    FUNCTION
+    LABEL org.opencontainers.image.source="https://github.com/expnt/containers"
+

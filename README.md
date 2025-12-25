@@ -2,67 +2,11 @@
 
 ## Container Images
 
-### TimescaleDB
-
-```
-ghcr.io/[REPO_OWNER]/timescaledb:[PG_MAJOR]-plugin-v[PLUGIN_VERSION]
-```
-
-Features: PostgreSQL with TimescaleDB extension, optimized for CloudNativePG
-
-### Supabase
-
-```
-ghcr.io/[REPO_OWNER]/supabase:[PG_MAJOR]-plugin-v[PLUGIN_VERSION]
-```
-
-Features: PostgreSQL (Supabase distribution) with pg_failover_slots extension
-
-### MinIO
-
-```
-ghcr.io/[REPO_OWNER]/minio:[BASE_VERSION]
-```
-
-Mirrored Bitnami MinIO image from `bitnamilegacy` repository. The image is deprecated in the main Bitnami repository and has been mirrored for continued availability.
-
-### Redis
-
-```
-ghcr.io/[REPO_OWNER]/redis:[BASE_VERSION]
-```
-
-Mirrored Bitnami Redis image from `bitnamilegacy` repository. We use a single Redis image version across all deployments for consistency.
-
-### Python IAC
-
-```
-ghcr.io/[REPO_OWNER]/xep-python-iac:[BASE_VERSION]-bookworm
-```
-
-Pre-configured Python image for Infrastructure as Code (IAC) CI/CD pipelines. Includes:
-- Python 3.12 on Debian Bookworm
-- pipx, poetry (pinned version), pre-commit (pinned version)
-- OpenTofu (pinned version) - Terraform fork
-- tflint (pinned version) - Terraform linter
-
-This image follows the naming convention: `xep-[main image]-[flavor]:[upstream tag]`
-
-All dependencies are pinned to specific versions for stability. This image is optimized for GitLab CI pre-commit jobs to avoid installing dependencies on every pipeline run.
-
-## Usage with CloudNativePG
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: postgres-cluster
-spec:
-  instances: 3
-  imageName: ghcr.io/[REPO_OWNER]/timescaledb:[PG_MAJOR]-plugin-v[PLUGIN_VERSION]
-  storage:
-    size: 10Gi
-```
+- [TimescaleDB](./containers/timescaledb/README.md) - `ghcr.io/expnt/containers/timescaledb`
+- [Supabase](./containers/supabase/README.md) - `ghcr.io/expnt/containers/supabase`
+- [MinIO](./containers/minio/README.md) - `ghcr.io/expnt/containers/minio`
+- [Redis](./containers/redis/README.md) - `ghcr.io/expnt/containers/redis`
+- [Python IAC](./containers/python/README.md) - `ghcr.io/expnt/containers/xep-python-iac`
 
 ## Development
 
@@ -98,10 +42,12 @@ spec:
 To test multi-platform builds locally, you need QEMU installed:
 
 **macOS/Windows (Docker Desktop):**
+
 - QEMU is included, no setup needed
 - For Apple Silicon: Enable "Use Rosetta for x86/amd64 emulation" in Docker Desktop settings
 
 **Linux:**
+
 ```bash
 sudo apt-get install qemu-system binfmt-support qemu-user-static
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
@@ -109,6 +55,7 @@ docker stop earthly-buildkitd || true
 ```
 
 Then you can test:
+
 ```bash
 # Test both platforms
 ./dev/build.sh minio -o -m
@@ -126,6 +73,7 @@ Local builds only save images to your local Docker daemon for testing. To push i
 3. **CI will automatically build and push multi-platform images** when changes are merged to `main`
 
 The CI workflow:
+
 - Builds for both `linux/amd64` and `linux/arm64` platforms
 - Creates multi-manifest images
 - Pushes to `ghcr.io/[REPO_OWNER]/[container]:[tag]`
