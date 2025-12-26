@@ -1,3 +1,5 @@
+import os
+import subprocess
 import yaml
 from pathlib import Path
 from typing import Dict, Any, List
@@ -31,3 +33,22 @@ def get_containers() -> List[str]:
 def compute_tag(tag_pattern: str, version_vars: Dict[str, Any]) -> str:
     """Computes the final image tag based on a pattern and version variables."""
     return tag_pattern.format(**version_vars)
+
+
+def get_default_repo_owner() -> str:
+    """Get repo owner from GITHUB_REPOSITORY (owner/repo) or git remote."""
+    if repo := os.environ.get("GITHUB_REPOSITORY"):
+        return repo.split("/")[0]
+    try:
+        result = subprocess.run(
+            ["git", "config", "--get", "remote.origin.url"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            url = result.stdout.strip()
+            if "github.com" in url:
+                return url.split("github.com")[1].strip("/:").split("/")[0]
+    except Exception:
+        pass
+    return "local"

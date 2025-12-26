@@ -2,7 +2,7 @@ import click
 import os
 import json
 import requests
-from ..common import get_containers, load_versions, compute_tag
+from ..utils import get_containers, load_versions, compute_tag
 
 
 def get_changed_containers(files: list[str]) -> list[str]:

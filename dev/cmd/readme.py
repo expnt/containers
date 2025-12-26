@@ -1,6 +1,6 @@
 import click
 from rich.console import Console
-from ..common import get_containers, load_versions, get_repo_root
+from ..utils import get_containers, load_versions, get_repo_root
 
 console = Console()
 

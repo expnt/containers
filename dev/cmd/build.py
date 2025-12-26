@@ -1,10 +1,11 @@
 import click
-import subprocess
 import os
+import subprocess
 import sys
 from typing import Optional
 from rich.console import Console
-from ..common import get_containers, load_versions, compute_tag
+from ..utils import get_containers, load_versions, compute_tag, get_default_repo_owner
+
 
 console = Console()
 
@@ -34,7 +35,11 @@ def build(
         sys.exit(1)
 
     containers = [container] if container else get_containers()
-    repo_owner = repo_owner or os.environ.get("GITHUB_REPOSITORY_OWNER", os.getlogin())
+    repo_owner = (
+        repo_owner
+        or os.environ.get("GITHUB_REPOSITORY_OWNER")
+        or get_default_repo_owner()
+    )
 
     for c in containers:
         try:
