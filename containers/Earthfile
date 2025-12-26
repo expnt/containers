@@ -1,6 +1,19 @@
 VERSION 0.8
 
-add-labels:
+ADD_LABELS:
     FUNCTION
     LABEL org.opencontainers.image.source="https://github.com/expnt/containers"
 
+SAVE_IMAGE:
+    FUNCTION
+    ARG --required IMAGE_NAME
+    ARG --required TAG
+    ARG --required GITHUB_REPOSITORY_OWNER
+    LET owner = "$(echo $GITHUB_REPOSITORY_OWNER | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')"
+    SAVE IMAGE --push ghcr.io/${owner}/containers/${IMAGE_NAME}:${TAG}
+    SAVE IMAGE ${IMAGE_NAME}:${TAG}
+
+BUILD_MULTIPLATFORM:
+    FUNCTION
+    ARG --required TARGET
+    BUILD --platform=linux/amd64 --platform=linux/arm64 ${TARGET}

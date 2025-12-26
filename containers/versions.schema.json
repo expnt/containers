@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Container Version Manifest",
+  "type": "object",
+  "required": ["image_name", "versions"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "image_name": {
+      "type": "string",
+      "description": "Name of the container image"
+    },
+    "tag_pattern": {
+      "type": "string",
+      "description": "Tag pattern template using variables like {base_version}, {pg_major}, {plugin_version}",
+      "default": "{base_version}"
+    },
+    "watch": {
+      "type": "array",
+      "description": "List of upstream sources to watch for updates",
+      "items": {
+        "type": "object",
+        "required": ["type", "source", "pattern", "target"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["docker", "github"],
+            "description": "Type of upstream source"
+          },
+          "source": {
+            "type": "string",
+            "description": "Source identifier (docker: registry/image, github: owner/repo)"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Regex pattern to filter tags/releases"
+          },
+          "target": {
+            "type": "string",
+            "description": "Target field in versions to update (e.g., base_version, plugin_version)"
+          }
+        }
+      }
+    },
+    "versions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["base_version"],
+        "properties": {
+          "base_version": {
+            "type": "string",
+            "description": "Base image version tag"
+          },
+          "pg_major": {
+            "type": "string",
+            "description": "PostgreSQL major version (for postgres-based images)"
+          },
+          "plugin_version": {
+            "type": "string",
+            "description": "Plugin version (for images with plugins)"
+          },
+          "suffix": {
+            "type": "string",
+            "description": "Image tag suffix (e.g., bookworm)"
+          },
+          "poetry_version": {
+            "type": "string"
+          },
+          "precommit_version": {
+            "type": "string"
+          },
+          "opentofu_version": {
+            "type": "string"
+          },
+          "tflint_version": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,19 @@
-# Redis
+# redis
 
-```
-ghcr.io/expnt/containers/redis:[BASE_VERSION]
-```
+Aliased container image for Redis.
 
-Mirrored Bitnami Redis image from `bitnamilegacy` repository. We use a single Redis image version across all deployments for consistency.
+## Available Versions
+
+<!-- VERSIONS_START -->
+
+| Tag   | Base Version |
+| ----- | ------------ |
+| `7.2` | 7.2          |
+
+<!-- VERSIONS_END -->
+
+## Usage
+
+```bash
+docker pull ghcr.io/expnt/containers/redis:<tag>
+```

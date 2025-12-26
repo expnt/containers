@@ -1,81 +1,58 @@
-name: Container Pipeline
+name: Test
 
 on:
   pull_request:
     paths:
-      - 'containers/**'
-      - '.github/workflows/ci.yml'
-      - 'dev/build.sh'
-  push:
-    branches: [ main ]
-    paths:
-      - 'containers/**'
-      - '.github/workflows/ci.yml'
-      - 'dev/build.sh'
+      - "containers/**"
+      - ".github/workflows/ci.yml"
+      - "dev/**"
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  build:
-    name: Build
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
+  matrix:
+    name: Generate Matrix
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  
-      
-      - name: Install Earthly
-        uses: earthly/actions-setup@v1
-        with:
-          version: latest
-      
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Build containers
-        run: |
-          chmod +x ./dev/build.sh
-          ./dev/build.sh -o
+      - uses: actions/checkout@v4
 
-  release:
-    name: Build & Push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Get changed files
+        id: changed
+        uses: tj-actions/changed-files@v45
+        with:
+          separator: ","
+          files: |
+            containers/**
+            dev/**
+
+      - name: Install dependencies
+        run: pip install poetry && poetry install
+
+      - name: Generate matrix
+        id: set-matrix
+        run: echo "matrix=$(poetry run containers matrix --changed-files '${{ steps.changed.outputs.all_changed_files }}')" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build ${{ matrix.container }}:${{ matrix.tag }}
+    needs: matrix
+    if: needs.matrix.outputs.matrix != '{"include":[]}'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
-      - name: Set up QEMU
-        id: qemu
-        uses: docker/setup-qemu-action@v1
-        with:
-          image: tonistiigi/binfmt:latest
-          platforms: all
-      
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  
-      
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip install poetry && poetry install
+
       - name: Install Earthly
         uses: earthly/actions-setup@v1
         with:
           version: latest
-      
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Build and push containers
-        run: |
-          chmod +x ./dev/build.sh
-          ./dev/build.sh -p
-        shell: /usr/bin/bash -e {0}
-        env:
-          FORCE_COLOR: 1
+
+      - name: Build ${{ matrix.container }}:${{ matrix.tag }}
+        run: poetry run containers build ${{ matrix.container }} --version ${{ matrix.version }}

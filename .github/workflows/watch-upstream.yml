@@ -1,0 +1,107 @@
+name: Watch Upstream
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # Daily at 6 AM UTC
+  workflow_dispatch:
+    inputs:
+      container:
+        description: "Specific container to check (leave empty for all)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-updates:
+    name: Check for Updates
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
+      updates_json: ${{ steps.check.outputs.updates_json }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          pip install poetry && poetry install
+
+      - name: Check upstream versions
+        id: check
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ -n "${{ inputs.container }}" ]]; then
+            RESULT=$(poetry run containers check-upstream "${{ inputs.container }}" -j)
+          else
+            RESULT=$(poetry run containers check-upstream -j)
+          fi
+
+          HAS_UPDATES=$(echo "$RESULT" | jq 'if type == "array" then length > 0 else .updates | length > 0 end')
+          echo "has_updates=$HAS_UPDATES" >> "$GITHUB_OUTPUT"
+
+          if [[ "$HAS_UPDATES" == "true" ]]; then
+            MATRIX=$(echo "$RESULT" | jq -c 'if type == "array" then . else [.] end')
+          else
+            MATRIX="[]"
+          fi
+          echo "updates_json=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  open-prs:
+    name: Open PR for ${{ matrix.container }}
+    needs: check-updates
+    if: needs.check-updates.outputs.has_updates == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.check-updates.outputs.updates_json) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          pip install poetry && poetry install
+
+      - name: Update manifest
+        id: update
+        run: |
+          CONTAINER="${{ matrix.container }}"
+          UPDATES='${{ toJson(matrix.updates) }}'
+
+          TARGET=$(echo "$UPDATES" | jq -r '.[0].target')
+          VERSION=$(echo "$UPDATES" | jq -r '.[0].version')
+
+          poetry run containers update-version "$CONTAINER" --target "$TARGET" --version "$VERSION"
+          poetry run containers generate-readme
+
+          echo "container=$CONTAINER" >> "$GITHUB_OUTPUT"
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create Pull Request
+        if: steps.update.outputs.version != ''
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(${{ steps.update.outputs.container }}): update ${{ steps.update.outputs.target }} to ${{ steps.update.outputs.version }}"
+          title: "[${{ steps.update.outputs.container }}] Update ${{ steps.update.outputs.target }} to ${{ steps.update.outputs.version }}"
+          body: |
+            Automated PR to update upstream dependency.
+
+            **Container:** `${{ steps.update.outputs.container }}`
+            **Target:** `${{ steps.update.outputs.target }}`
+            **New Version:** `${{ steps.update.outputs.version }}`
+
+            This PR was created by the upstream watcher workflow.
+          branch: "update/${{ steps.update.outputs.container }}-${{ steps.update.outputs.target }}-${{ steps.update.outputs.version }}"
+          base: main
+          labels: |
+            automated
+            dependency-update
+          delete-branch: true

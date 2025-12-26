@@ -1,0 +1,11 @@
+image_name: supabase
+tag_pattern: "{pg_major}-plugin-v{plugin_version}"
+versions:
+  - base_version: 15.1.1.34
+    pg_major: "15"
+    plugin_version: 1.0.0
+watch:
+  - pattern: ^\d+\.\d+\.\d+\.\d+$
+    source: docker.io/supabase/postgres
+    target: base_version
+    type: docker

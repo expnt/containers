@@ -1,21 +1,19 @@
-# TimescaleDB
+# timescaledb
 
-```
-ghcr.io/expnt/containers/timescaledb:[PG_MAJOR]-plugin-v[PLUGIN_VERSION]
-```
+CloudNativePG PostgreSQL container with TimescaleDB extension.
 
-Features: PostgreSQL with TimescaleDB extension, optimized for CloudNativePG
+## Available Versions
 
-## Usage with CloudNativePG
+<!-- VERSIONS_START -->
 
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: postgres-cluster
-spec:
-  instances: 3
-  imageName: ghcr.io/[REPO_OWNER]/timescaledb:[PG_MAJOR]-plugin-v[PLUGIN_VERSION]
-  storage:
-    size: 10Gi
+| Tag                 | Base Version |
+| ------------------- | ------------ |
+| `17-plugin-v2.20.1` | 17           |
+
+<!-- VERSIONS_END -->
+
+## Usage
+
+```bash
+docker pull ghcr.io/expnt/containers/timescaledb:<tag>
 ```

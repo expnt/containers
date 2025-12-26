@@ -1,7 +1,19 @@
-# MinIO
+# minio
 
-```
-ghcr.io/expnt/containers/minio:[BASE_VERSION]
-```
+Aliased container image for MinIO object storage.
 
-Mirrored Bitnami MinIO image from `bitnamilegacy` repository. The image is deprecated in the main Bitnami repository and has been mirrored for continued availability.
+## Available Versions
+
+<!-- VERSIONS_START -->
+
+| Tag        | Base Version |
+| ---------- | ------------ |
+| `2022.2.7` | 2022.2.7     |
+
+<!-- VERSIONS_END -->
+
+## Usage
+
+```bash
+docker pull ghcr.io/expnt/containers/minio:<tag>
+```

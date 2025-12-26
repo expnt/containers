@@ -1,0 +1,68 @@
+name: Release
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "containers/**"
+            - ".github/workflows/cd.yml"
+            - "dev/**"
+
+permissions:
+    contents: read
+    packages: write
+
+jobs:
+    matrix:
+        name: Generate Matrix
+        runs-on: ubuntu-latest
+        outputs:
+            matrix: ${{ steps.set-matrix.outputs.matrix }}
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install dependencies
+              run: pip install poetry && poetry install
+
+            - name: Generate matrix
+              id: set-matrix
+              run: echo "matrix=$(poetry run containers matrix --skip-existing)" >> $GITHUB_OUTPUT
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    release:
+        name: Release ${{ matrix.container }}:${{ matrix.tag }}
+        needs: matrix
+        if: needs.matrix.outputs.matrix != '{"include":[]}'
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+        steps:
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@v3
+              with:
+                  image: tonistiigi/binfmt:latest
+                  platforms: all
+
+            - uses: actions/checkout@v4
+
+            - name: Install dependencies
+              run: pip install poetry && poetry install
+
+            - name: Install Earthly
+              uses: earthly/actions-setup@v1
+              with:
+                  version: latest
+
+            - name: Login to GitHub Container Registry
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build and push ${{ matrix.container }}:${{ matrix.tag }}
+              run: poetry run containers build ${{ matrix.container }} --version ${{ matrix.version }} -p
+              env:
+                  FORCE_COLOR: 1

@@ -2,11 +2,15 @@
 
 ## Container Images
 
-- [TimescaleDB](./containers/timescaledb/README.md) - `ghcr.io/expnt/containers/timescaledb`
-- [Supabase](./containers/supabase/README.md) - `ghcr.io/expnt/containers/supabase`
-- [MinIO](./containers/minio/README.md) - `ghcr.io/expnt/containers/minio`
-- [Redis](./containers/redis/README.md) - `ghcr.io/expnt/containers/redis`
-- [Python IAC](./containers/python/README.md) - `ghcr.io/expnt/containers/xep-python-iac`
+<!-- VERSIONS_START -->
+
+- [minio](./containers/minio/README.md) - `ghcr.io/expnt/containers/minio`
+- [python](./containers/python/README.md) - `ghcr.io/expnt/containers/xep-python-iac`
+- [redis](./containers/redis/README.md) - `ghcr.io/expnt/containers/redis`
+- [supabase](./containers/supabase/README.md) - `ghcr.io/expnt/containers/supabase`
+- [timescaledb](./containers/timescaledb/README.md) - `ghcr.io/expnt/containers/timescaledb`
+
+<!-- VERSIONS_END -->
 
 ## Development
 
@@ -14,27 +18,34 @@
 
 - [Earthly](https://earthly.dev/get-earthly)
 - Docker
+- Python 3.12+ and Poetry
 
 ### Building Locally
 
 ```bash
-# Build specific container (saves to local Docker)
-./dev/build.sh timescaledb -o
-./dev/build.sh supabase -o
-./dev/build.sh minio -o
-./dev/build.sh redis -o
-./dev/build.sh python -o
+# Install dependencies
+poetry install
+
+# Build specific container (all versions, saves to local Docker)
+poetry run containers build timescaledb -o
+poetry run containers build supabase -o
+poetry run containers build minio -o
+poetry run containers build redis -o
+poetry run containers build python -o
+
+# Build specific version only
+poetry run containers build minio -o --version 2022.2.7
 
 # Build all containers (saves to local Docker)
-./dev/build.sh -o
+poetry run containers build --all -o
 
 # Build with multi-platform support (linux/amd64 and linux/arm64)
-./dev/build.sh minio -o -m
-./dev/build.sh redis -o -m
-./dev/build.sh timescaledb -o -m
+poetry run containers build minio -o -m
+poetry run containers build redis -o -m
+poetry run containers build timescaledb -o -m
 
 # For more options
-./dev/build.sh --help
+poetry run containers build --help
 ```
 
 ### Local Multi-Platform Testing
@@ -58,8 +69,8 @@ Then you can test:
 
 ```bash
 # Test both platforms
-./dev/build.sh minio -o -m
-./dev/build.sh redis -o -m
+poetry run containers build minio -o -m
+poetry run containers build redis -o -m
 ```
 
 ### Pushing to Registry
@@ -82,4 +93,10 @@ The CI workflow:
 
 ### Updating Versions
 
-Edit the corresponding `versions.env` file.
+Edit the corresponding `versions.yaml` file in each container directory. The manifest supports multiple versions per container.
+
+### Regenerating READMEs
+
+```bash
+poetry run containers generate-readme
+```
