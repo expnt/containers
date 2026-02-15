@@ -1,20 +1,18 @@
 VERSION 0.8
+IMPORT .. AS common
 
-ARG BASE_VERSION 
-ARG PLUGIN_VERSION
-ARG PLUGIN_VERSION_TAG
-ARG PG_MAJOR
-ARG GITHUB_REPOSITORY_OWNER
+ARG --global BASE_VERSION 
+ARG --global PLUGIN_VERSION
+ARG --global PG_MAJOR
+ARG --global TAG
+ARG --global GITHUB_REPOSITORY_OWNER
 
 supabase-base:
-    ARG BASE_VERSION
     FROM supabase/postgres:$BASE_VERSION
+    DO common+ADD_LABELS
 
 validate:
     FROM +supabase-base
-    ARG BASE_VERSION
-    ARG PLUGIN_VERSION
-    ARG PG_MAJOR
     RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
     RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
     RUN --no-cache test -n "$PG_MAJOR" || (echo "PG_MAJOR is required" && exit 1)
@@ -23,14 +21,6 @@ build:
     BUILD +validate
     FROM +supabase-base
     USER root
-    
-    ARG BASE_VERSION
-    ARG PLUGIN_VERSION
-    ARG PLUGIN_VERSION_TAG
-    ARG PG_MAJOR
-    ARG GITHUB_REPOSITORY_OWNER
-    
-    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
 
     RUN set -xe && \
         apt-get update && \
@@ -59,8 +49,7 @@ build:
     USER postgres
     EXPOSE 5432
 
-    SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/supabase:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
-    SAVE IMAGE supabase:${PG_MAJOR}-plugin-${PLUGIN_VERSION_TAG}
+    DO common+SAVE_IMAGE --IMAGE_NAME=supabase --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
 
 build-multiplatform:
-    BUILD --platform=linux/amd64 --platform=linux/arm64 +build
+    DO common+BUILD_MULTIPLATFORM --TARGET=+build

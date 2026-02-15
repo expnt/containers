@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "containers"
+version = "0.1.0"
+description = "Container management scripts"
+authors = ["Exponent.ch"]
+readme = "README.md"
+packages = [{include = "dev"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pyyaml = "^6.0.1"
+click = "^8.1.7"
+rich = "^13.7.0"
+requests = "^2.31.0"
+pygithub = "^2.8.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+containers = "dev.main:cli"
+

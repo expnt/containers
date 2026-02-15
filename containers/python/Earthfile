@@ -1,32 +1,26 @@
 VERSION 0.8
+IMPORT .. AS common
 
-ARG BASE_VERSION
-ARG GITHUB_REPOSITORY_OWNER
-ARG POETRY_VERSION
-ARG PRECOMMIT_VERSION
-ARG OPENTOFU_VERSION
-ARG TFLINT_VERSION
+ARG --global BASE_VERSION
+ARG --global TAG
+ARG --global GITHUB_REPOSITORY_OWNER
+ARG --global POETRY_VERSION
+ARG --global PRECOMMIT_VERSION
+ARG --global OPENTOFU_VERSION
+ARG --global TFLINT_VERSION
 
 python-base:
-    ARG BASE_VERSION
     FROM python:${BASE_VERSION}-bookworm
+    DO common+ADD_LABELS
 
 validate:
     FROM +python-base
-    ARG BASE_VERSION
     RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
 
 build:
     BUILD +validate
     FROM +python-base
     USER root
-    ARG BASE_VERSION
-    ARG GITHUB_REPOSITORY_OWNER
-    ARG POETRY_VERSION
-    ARG PRECOMMIT_VERSION
-    ARG OPENTOFU_VERSION
-    ARG TFLINT_VERSION
-    RUN GITHUB_REPOSITORY_OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -d '/' | sed 's/_/-/g')
     
     RUN set -eux && \
         apt-get update && \
@@ -57,9 +51,7 @@ build:
     
     ENV PATH="/root/.local/bin:$PATH"
     
-    SAVE IMAGE --push ghcr.io/${GITHUB_REPOSITORY_OWNER}/xep-python-iac:${BASE_VERSION}-bookworm
-    SAVE IMAGE xep-python-iac:${BASE_VERSION}-bookworm
+    DO common+SAVE_IMAGE --IMAGE_NAME=xep-python-iac --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
 
 build-multiplatform:
-    BUILD --platform=linux/amd64 --platform=linux/arm64 +build
-
+    DO common+BUILD_MULTIPLATFORM --TARGET=+build

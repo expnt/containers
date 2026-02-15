@@ -1,0 +1,9 @@
+image_name: minio
+tag_pattern: "{base_version}"
+versions:
+  - base_version: 2022.2.7
+watch:
+  - pattern: ^\d{4}\.\d+\.\d+$
+    source: docker.io/bitnamilegacy/minio
+    target: base_version
+    type: docker

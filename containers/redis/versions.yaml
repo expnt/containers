@@ -1,0 +1,9 @@
+image_name: redis
+tag_pattern: "{base_version}"
+versions:
+  - base_version: 7.2
+watch:
+  - pattern: ^\d+\.\d+\.\d+$
+    source: docker.io/bitnamilegacy/redis
+    target: base_version
+    type: docker
