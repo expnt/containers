@@ -19,4 +19,4 @@ build:
     DO common+SAVE_IMAGE --IMAGE_NAME=redis --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
 
 build-multiplatform:
-    DO common+BUILD_MULTIPLATFORM --TARGET=+build
+    DO common+BUILD_MULTIPLATFORM --TARGET=./redis+build
