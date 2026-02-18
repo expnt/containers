@@ -2,10 +2,6 @@ name: Test
 
 on:
   pull_request:
-    paths:
-      - "containers/**"
-      - ".github/workflows/ci.yml"
-      - "dev/**"
 
 permissions:
   contents: read
