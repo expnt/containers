@@ -4,9 +4,9 @@ IMPORT .. AS common
 ARG --global BASE_VERSION
 ARG --global TAG
 ARG --global GITHUB_REPOSITORY_OWNER
-ARG BUILDX_VERSION=v0.20.1
 
 docker-base:
+    ARG BUILDX_VERSION=v0.20.1
     FROM docker.io/docker:${BASE_VERSION}-dind
     RUN apk add --no-cache \
         parallel \
