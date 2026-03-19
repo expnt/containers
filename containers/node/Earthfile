@@ -6,7 +6,7 @@ ARG --global TAG
 ARG --global GITHUB_REPOSITORY_OWNER
 
 node-base:
-    FROM docker.io/library/node:${BASE_VERSION}-alpine
+    FROM docker.io/library/node:${BASE_VERSION}
     DO common+ADD_LABELS
 
 validate:
