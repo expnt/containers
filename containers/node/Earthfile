@@ -1,0 +1,22 @@
+VERSION 0.8
+IMPORT .. AS common
+
+ARG --global BASE_VERSION
+ARG --global TAG
+ARG --global GITHUB_REPOSITORY_OWNER
+
+node-base:
+    FROM docker.io/library/node:${BASE_VERSION}-alpine
+    DO common+ADD_LABELS
+
+validate:
+    FROM +node-base
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+
+build:
+    BUILD +validate
+    FROM +node-base
+    DO common+SAVE_IMAGE --IMAGE_NAME=node --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+
+build-multiplatform:
+    DO common+BUILD_MULTIPLATFORM --TARGET=./node+build
