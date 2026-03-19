@@ -8,7 +8,7 @@ Aliased container image for PHP.
 
 | Tag         | Base Version |
 | ----------- | ------------ |
-| `8.1-fpm`   | 8.1          |
+| `8.1-fpm`   | 8.1-fpm      |
 
 <!-- VERSIONS_END -->
 

@@ -6,7 +6,7 @@ ARG --global TAG
 ARG --global GITHUB_REPOSITORY_OWNER
 
 php-base:
-    FROM docker.io/library/php:${BASE_VERSION}-fpm
+    FROM docker.io/library/php:${BASE_VERSION}
     DO common+ADD_LABELS
 
 validate:
