@@ -26,7 +26,8 @@ docker-base:
         BINARY="buildx-${BUILDX_VERSION}.linux-${ARCH}" && \
         wget "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/${BINARY}" && \
         wget -O checksums.txt "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/checksums.txt" && \
-        grep "  ${BINARY}$" checksums.txt | sha256sum -c - && \
+        EXPECTED_CHECKSUM=$(awk "/${BINARY}\$/ && !/(provenance|sbom)/ {print \$1}" checksums.txt) && \
+        echo "${EXPECTED_CHECKSUM}  ${BINARY}" | sha256sum -c - && \
         mv "${BINARY}" ~/.docker/cli-plugins/docker-buildx && \
         chmod +x ~/.docker/cli-plugins/docker-buildx && \
         rm -f checksums.txt
