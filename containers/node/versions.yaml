@@ -3,7 +3,7 @@ tag_pattern: "{base_version}"
 versions:
   - base_version: "22-alpine"
 watch:
-  - pattern: ^(22-alpine|23-alpine|24-alpine)$
+  - pattern: ^(\d+)-alpine$
     source: docker.io/library/node
     target: base_version
     type: docker
