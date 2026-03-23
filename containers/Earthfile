@@ -16,4 +16,4 @@ SAVE_IMAGE:
 BUILD_MULTIPLATFORM:
     FUNCTION
     ARG --required TARGET
-    BUILD --platform=linux/amd64 --platform=linux/arm64 ${TARGET}
+    BUILD --platform=linux/amd64 --platform=linux/arm64 --pass-args ${TARGET}
