@@ -19,4 +19,4 @@ build:
     DO common+SAVE_IMAGE --IMAGE_NAME=minio --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
 
 build-multiplatform:
-    DO common+BUILD_MULTIPLATFORM --TARGET=./minio+build
+    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./minio+build
