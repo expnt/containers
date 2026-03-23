@@ -23,12 +23,13 @@ docker-base:
             aarch64) ARCH="arm64" ;; \
             *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
         esac && \
-        wget https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-${ARCH} && \
-        wget https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-${ARCH}.sha256 && \
-        sha256sum -c buildx-${BUILDX_VERSION}.linux-${ARCH}.sha256 && \
-        mv buildx-${BUILDX_VERSION}.linux-${ARCH} ~/.docker/cli-plugins/docker-buildx && \
+        BINARY="buildx-${BUILDX_VERSION}.linux-${ARCH}" && \
+        wget "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/${BINARY}" && \
+        wget -O checksums.txt "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/checksums.txt" && \
+        grep "${BINARY}" checksums.txt | sha256sum -c - && \
+        mv "${BINARY}" ~/.docker/cli-plugins/docker-buildx && \
         chmod +x ~/.docker/cli-plugins/docker-buildx && \
-        rm -f buildx-${BUILDX_VERSION}.linux-${ARCH}.sha256
+        rm -f checksums.txt
     RUN docker buildx version
     DO common+ADD_LABELS
 
