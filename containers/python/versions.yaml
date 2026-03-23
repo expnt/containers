@@ -2,8 +2,13 @@ image_name: python
 tag_pattern: "{base_version}"
 versions:
   - base_version: "3.12"
+  - base_version: "3.13-slim-bullseye"
 watch:
   - pattern: ^\d+\.\d+$
+    source: docker.io/library/python
+    target: base_version
+    type: docker
+  - pattern: ^\d+\.\d+-slim-bullseye$
     source: docker.io/library/python
     target: base_version
     type: docker

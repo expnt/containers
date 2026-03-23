@@ -6,9 +6,10 @@ Aliased container image for Python.
 
 <!-- VERSIONS_START -->
 
-| Tag         | Base Version |
-| ----------- | ------------ |
-| `3.12`      | 3.12         |
+| Tag                  | Base Version       |
+| -------------------- | ------------------ |
+| `3.12`               | 3.12               |
+| `3.13-slim-bullseye` | 3.13-slim-bullseye |
 
 <!-- VERSIONS_END -->
 
