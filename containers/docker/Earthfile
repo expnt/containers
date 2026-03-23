@@ -44,4 +44,4 @@ build:
     DO common+SAVE_IMAGE --IMAGE_NAME=docker --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
 
 build-multiplatform:
-    BUILD --platform=linux/amd64 --platform=linux/arm64 +build
+    DO common+BUILD_MULTIPLATFORM --TARGET=./docker+build
