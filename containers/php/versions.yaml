@@ -3,7 +3,7 @@ tag_pattern: "{base_version}"
 versions:
   - base_version: "8.1-fpm"
 watch:
-  - pattern: ^(8\.1-fpm|8\.2-fpm|8\.3-fpm)$
+  - pattern: ^[\d.]+-fpm$
     source: docker.io/library/php
     target: base_version
     type: docker
