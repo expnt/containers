@@ -1,0 +1,47 @@
+VERSION 0.8
+IMPORT .. AS common
+
+ARG --global BASE_VERSION
+ARG --global TAG
+ARG --global GITHUB_REPOSITORY_OWNER
+
+docker-base:
+    ARG BUILDX_VERSION=v0.20.1
+    FROM docker.io/docker:${BASE_VERSION}-dind
+    RUN apk add --no-cache \
+        parallel \
+        kubectl \
+        bash \
+        wget \
+        ca-certificates
+    RUN set -eux && \
+        mkdir -p ~/.docker/cli-plugins && \
+        cd /tmp && \
+        ARCH=$(uname -m) && \
+        case "${ARCH}" in \
+            x86_64) ARCH="amd64" ;; \
+            aarch64) ARCH="arm64" ;; \
+            *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+        esac && \
+        BINARY="buildx-${BUILDX_VERSION}.linux-${ARCH}" && \
+        wget "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/${BINARY}" && \
+        wget -O checksums.txt "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/checksums.txt" && \
+        EXPECTED_CHECKSUM=$(awk "/${BINARY}\$/ && !/(provenance|sbom)/ {print \$1}" checksums.txt) && \
+        echo "${EXPECTED_CHECKSUM}  ${BINARY}" | sha256sum -c - && \
+        mv "${BINARY}" ~/.docker/cli-plugins/docker-buildx && \
+        chmod +x ~/.docker/cli-plugins/docker-buildx && \
+        rm -f checksums.txt
+    RUN docker buildx version
+    DO common+ADD_LABELS
+
+validate:
+    FROM +docker-base
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+
+build:
+    BUILD +validate
+    FROM +docker-base
+    DO common+SAVE_IMAGE --IMAGE_NAME=docker --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+
+build-multiplatform:
+    DO common+BUILD_MULTIPLATFORM --TARGET=./docker+build

@@ -4,6 +4,7 @@
 
 <!-- VERSIONS_START -->
 
+- [docker](./containers/docker/README.md) - `ghcr.io/expnt/containers/docker`
 - [minio](./containers/minio/README.md) - `ghcr.io/expnt/containers/minio`
 - [python](./containers/python/README.md) - `ghcr.io/expnt/containers/xep-python-iac`
 - [redis](./containers/redis/README.md) - `ghcr.io/expnt/containers/redis`
@@ -27,6 +28,7 @@
 poetry install
 
 # Build specific container (all versions, saves to local Docker)
+poetry run containers build docker -o
 poetry run containers build timescaledb -o
 poetry run containers build supabase -o
 poetry run containers build minio -o
@@ -34,12 +36,14 @@ poetry run containers build redis -o
 poetry run containers build python -o
 
 # Build specific version only
+poetry run containers build docker -o --version 27
 poetry run containers build minio -o --version 2022.2.7
 
 # Build all containers (saves to local Docker)
 poetry run containers build --all -o
 
 # Build with multi-platform support (linux/amd64 and linux/arm64)
+poetry run containers build docker -o -m
 poetry run containers build minio -o -m
 poetry run containers build redis -o -m
 poetry run containers build timescaledb -o -m
