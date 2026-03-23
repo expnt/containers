@@ -1,0 +1,22 @@
+VERSION 0.8
+IMPORT .. AS common
+
+ARG --global BASE_VERSION
+ARG --global TAG
+ARG --global GITHUB_REPOSITORY_OWNER
+
+python-base:
+    FROM docker.io/library/python:${BASE_VERSION}
+    DO common+ADD_LABELS
+
+validate:
+    FROM +python-base
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+
+build:
+    BUILD +validate
+    FROM +python-base
+    DO common+SAVE_IMAGE --IMAGE_NAME=python --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+
+build-multiplatform:
+    DO common+BUILD_MULTIPLATFORM --TARGET=./python+build

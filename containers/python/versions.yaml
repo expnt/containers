@@ -1,0 +1,9 @@
+image_name: python
+tag_pattern: "{base_version}"
+versions:
+  - base_version: "3.12"
+watch:
+  - pattern: ^\d+\.\d+$
+    source: docker.io/library/python
+    target: base_version
+    type: docker
