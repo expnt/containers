@@ -1,9 +1,9 @@
 image_name: node
-tag_pattern: "{base_version}-alpine"
+tag_pattern: "{base_version}"
 versions:
-  - base_version: "22"
+  - base_version: "22-alpine"
 watch:
-  - pattern: ^(22|23|24)\-alpine$
+  - pattern: ^(\d+)-alpine$
     source: docker.io/library/node
     target: base_version
     type: docker
