@@ -9,6 +9,7 @@ Aliased container image for Node.js.
 | Tag         | Base Version |
 | ----------- | ------------ |
 | `22-alpine` | 22-alpine    |
+| `22-slim`   | 22-slim      |
 
 <!-- VERSIONS_END -->
 
