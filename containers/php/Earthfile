@@ -1,0 +1,22 @@
+VERSION 0.8
+IMPORT .. AS common
+
+ARG --global BASE_VERSION
+ARG --global TAG
+ARG --global GITHUB_REPOSITORY_OWNER
+
+php-base:
+    FROM docker.io/library/php:${BASE_VERSION}
+    DO common+ADD_LABELS
+
+validate:
+    FROM +php-base
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+
+build:
+    BUILD +validate
+    FROM +php-base
+    DO common+SAVE_IMAGE --IMAGE_NAME=php --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+
+build-multiplatform:
+    DO common+BUILD_MULTIPLATFORM --TARGET=./php+build

@@ -1,0 +1,9 @@
+image_name: php
+tag_pattern: "{base_version}"
+versions:
+  - base_version: "8.1-fpm"
+watch:
+  - pattern: ^[\d.]+-fpm$
+    source: docker.io/library/php
+    target: base_version
+    type: docker
