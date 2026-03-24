@@ -19,4 +19,4 @@ build:
     DO common+SAVE_IMAGE --IMAGE_NAME=php --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
 
 build-multiplatform:
-    DO --pass-argscommon+BUILD_MULTIPLATFORM --TARGET=./php+build
+    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./php+build
