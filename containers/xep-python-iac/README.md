@@ -1,4 +1,4 @@
-# python
+# XEP-Python-IaC
 
 Python container with IAC tooling (Poetry, pre-commit, OpenTofu, TFLint).
 

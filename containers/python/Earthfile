@@ -19,4 +19,4 @@ build:
     DO common+SAVE_IMAGE --IMAGE_NAME=python --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
 
 build-multiplatform:
-    DO common+BUILD_MULTIPLATFORM --TARGET=./python+build
+    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./python+build
