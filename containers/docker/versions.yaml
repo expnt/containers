@@ -1,9 +1,9 @@
 image_name: docker
 tag_pattern: "{base_version}"
 versions:
-  - base_version: "27"
+  - base_version: "27-dind"
 watch:
-  - pattern: ^\d+$
+  - pattern: ^\d+-dind$
     source: docker.io/library/docker
     target: base_version
     type: docker

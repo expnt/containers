@@ -6,7 +6,8 @@
 
 - [docker](./containers/docker/README.md) - `ghcr.io/expnt/containers/docker`
 - [minio](./containers/minio/README.md) - `ghcr.io/expnt/containers/minio`
-- [python](./containers/python/README.md) - `ghcr.io/expnt/containers/xep-python-iac`
+- [node](./containers/node/README.md) - `ghcr.io/expnt/containers/node`
+- [xep-python-iac](./containers/xep-python-iac/README.md) - `ghcr.io/expnt/containers/xep-python-iac`
 - [redis](./containers/redis/README.md) - `ghcr.io/expnt/containers/redis`
 - [supabase](./containers/supabase/README.md) - `ghcr.io/expnt/containers/supabase`
 - [timescaledb](./containers/timescaledb/README.md) - `ghcr.io/expnt/containers/timescaledb`
@@ -34,6 +35,7 @@ poetry run containers build supabase -o
 poetry run containers build minio -o
 poetry run containers build redis -o
 poetry run containers build python -o
+poetry run containers build node -o
 
 # Build specific version only
 poetry run containers build docker -o --version 27

@@ -5,18 +5,18 @@ ARG --global BASE_VERSION
 ARG --global TAG
 ARG --global GITHUB_REPOSITORY_OWNER
 
-python-base:
-    FROM docker.io/library/python:${BASE_VERSION}
+node-base:
+    FROM docker.io/library/node:${BASE_VERSION}
     DO common+ADD_LABELS
 
 validate:
-    FROM +python-base
+    FROM +node-base
     RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
 
 build:
     BUILD +validate
-    FROM +python-base
-    DO common+SAVE_IMAGE --IMAGE_NAME=python --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+    FROM +node-base
+    DO common+SAVE_IMAGE --IMAGE_NAME=node --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
 
 build-multiplatform:
-    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./python+build
+    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./node+build

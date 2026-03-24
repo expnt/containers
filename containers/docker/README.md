@@ -6,9 +6,9 @@ Aliased container image for Docker-in-Docker (dind) with buildx and additional t
 
 <!-- VERSIONS_START -->
 
-| Tag  | Base Version |
-| ---- | ------------ |
-| `27` | 27           |
+| Tag       | Base Version |
+| --------- | ------------ |
+| `27-dind` | 27-dind      |
 
 <!-- VERSIONS_END -->
 

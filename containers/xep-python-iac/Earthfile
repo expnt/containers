@@ -1,0 +1,57 @@
+VERSION 0.8
+IMPORT .. AS common
+
+ARG --global BASE_VERSION
+ARG --global TAG
+ARG --global GITHUB_REPOSITORY_OWNER
+ARG --global POETRY_VERSION
+ARG --global PRECOMMIT_VERSION
+ARG --global OPENTOFU_VERSION
+ARG --global TFLINT_VERSION
+
+python-base:
+    FROM python:${BASE_VERSION}-bookworm
+    DO common+ADD_LABELS
+
+validate:
+    FROM +python-base
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+
+build:
+    BUILD +validate
+    FROM +python-base
+    USER root
+    
+    RUN set -eux && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+            curl \
+            ca-certificates \
+            gnupg \
+            lsb-release \
+            unzip && \
+        apt-get install -y --no-install-recommends pipx && \
+        pipx install poetry==${POETRY_VERSION} && \
+        pipx install pre-commit==${PRECOMMIT_VERSION} && \
+        ARCH=$(dpkg --print-architecture) && \
+        curl --http1.1 -fsSL -o /tmp/opentofu.deb \
+            https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_${ARCH}.deb && \
+        dpkg -i /tmp/opentofu.deb && \
+        curl --http1.1 -fsSL -o /tmp/tflint.zip \
+            https://github.com/terraform-linters/tflint/releases/download/v${TFLINT_VERSION}/tflint_linux_${ARCH}.zip && \
+        unzip /tmp/tflint.zip -d /usr/local/bin && \
+        chmod +x /usr/local/bin/tflint && \
+        apt-get purge -y curl gnupg lsb-release unzip && \
+        apt-get clean && \
+        apt-get autoremove -y && \
+        rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
+               /usr/share/doc/* /usr/share/man/* /usr/share/info/* \
+               /usr/share/i18n/locales/* /usr/share/locale/* && \
+        (find /usr/share/i18n -type f ! -name "POSIX" -delete || true)
+    
+    ENV PATH="/root/.local/bin:$PATH"
+    
+    DO common+SAVE_IMAGE --IMAGE_NAME=xep-python-iac --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+
+build-multiplatform:
+    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./xep-python-iac+build

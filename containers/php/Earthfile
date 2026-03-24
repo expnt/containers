@@ -5,18 +5,18 @@ ARG --global BASE_VERSION
 ARG --global TAG
 ARG --global GITHUB_REPOSITORY_OWNER
 
-python-base:
-    FROM docker.io/library/python:${BASE_VERSION}
+php-base:
+    FROM docker.io/library/php:${BASE_VERSION}
     DO common+ADD_LABELS
 
 validate:
-    FROM +python-base
+    FROM +php-base
     RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
 
 build:
     BUILD +validate
-    FROM +python-base
-    DO common+SAVE_IMAGE --IMAGE_NAME=python --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+    FROM +php-base
+    DO common+SAVE_IMAGE --IMAGE_NAME=php --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
 
 build-multiplatform:
-    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./python+build
+    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./php+build

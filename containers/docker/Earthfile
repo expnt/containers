@@ -7,7 +7,7 @@ ARG --global GITHUB_REPOSITORY_OWNER
 
 docker-base:
     ARG BUILDX_VERSION=v0.20.1
-    FROM docker.io/docker:${BASE_VERSION}-dind
+    FROM docker.io/docker:${BASE_VERSION}
     RUN apk add --no-cache \
         parallel \
         kubectl \
