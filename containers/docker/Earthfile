@@ -13,9 +13,11 @@ docker-base:
         kubectl \
         bash \
         wget \
-        ca-certificates
+        ca-certificates \
+        kubectl
     RUN set -eux && \
         mkdir -p ~/.docker/cli-plugins && \
+        mkdir -p ~/.kube && \
         cd /tmp && \
         ARCH=$(uname -m) && \
         case "${ARCH}" in \
