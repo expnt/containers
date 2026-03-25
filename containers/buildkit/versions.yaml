@@ -1,0 +1,9 @@
+image_name: buildkit
+tag_pattern: "{base_version}"
+versions:
+  - base_version: "buildx-stable-1"
+watch:
+  - pattern: ^buildx-stable-(\d+)$
+    source: docker.io/moby/buildkit
+    target: base_version
+    type: docker
