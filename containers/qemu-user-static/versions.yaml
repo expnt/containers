@@ -1,0 +1,9 @@
+image_name: qemu-user-static
+tag_pattern: "{base_version}"
+versions:
+  - base_version: "latest"
+watch:
+  - pattern: ^latest$
+    source: docker.io/multiarch/qemu-user-static
+    target: base_version
+    type: docker
