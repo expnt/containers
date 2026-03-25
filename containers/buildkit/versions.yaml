@@ -4,6 +4,6 @@ versions:
   - base_version: "buildx-stable-1"
 watch:
   - pattern: ^buildx-stable-(\d+)$
-    source: docker.io/library/node
+    source: docker.io/moby/buildkit
     target: base_version
     type: docker
