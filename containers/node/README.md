@@ -6,10 +6,11 @@ Aliased container image for Node.js.
 
 <!-- VERSIONS_START -->
 
-| Tag         | Base Version |
-| ----------- | ------------ |
-| `22-alpine` | 22-alpine    |
-| `22-slim`   | 22-slim      |
+| Tag           | Base Version |
+| ------------- | ------------ |
+| `22-alpine`   | 22-alpine    |
+| `22-slim`     | 22-slim      |
+| `22-bullseye` | 22-bullseye  |
 
 <!-- VERSIONS_END -->
 
