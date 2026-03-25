@@ -1,14 +1,14 @@
 image_name: timescaledb
-tag_pattern: "{base_version}-plugin-v{plugin_version}"
+tag_pattern: '{base_version}-plugin-v{plugin_version}'
 versions:
-  - base_version: "17"
-    plugin_version: 2.20.1
+- base_version: '17'
+  plugin_version: 2.26.0
 watch:
-  - pattern: ^(16|17)$
-    source: ghcr.io/cloudnative-pg/postgresql
-    target: base_version
-    type: docker
-  - pattern: ^\d+\.\d+\.\d+$
-    source: timescale/timescaledb
-    target: plugin_version
-    type: github
+- pattern: ^(16|17)$
+  source: ghcr.io/cloudnative-pg/postgresql
+  target: base_version
+  type: docker
+- pattern: ^\d+\.\d+\.\d+$
+  source: timescale/timescaledb
+  target: plugin_version
+  type: github
