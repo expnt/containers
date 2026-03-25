@@ -1,4 +1,4 @@
-image_name: node
+image_name: buildkit
 tag_pattern: "{base_version}"
 versions:
   - base_version: "buildx-stable-1"
