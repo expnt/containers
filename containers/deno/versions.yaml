@@ -1,0 +1,9 @@
+image_name: deno
+tag_pattern: "{base_version}"
+versions:
+  - base_version: "1.41.3"
+watch:
+  - pattern: ^1\.\d+\.\d+$
+    source: docker.io/denoland/deno
+    target: base_version
+    type: docker
