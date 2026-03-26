@@ -5,6 +5,7 @@ versions:
   - base_version: "22-slim"
   - base_version: "22-bullseye"
   - base_version: "18-buster"
+  - base_version: "20-bullseye-slim"
 watch:
   - pattern: ^(\d+)-alpine$
     source: docker.io/library/node
@@ -19,6 +20,10 @@ watch:
     target: base_version
     type: docker
   - pattern: ^(\d+)-buster$
+    source: docker.io/library/node
+    target: base_version
+    type: docker
+  - pattern: ^(\d+)-bullseye-slim$
     source: docker.io/library/node
     target: base_version
     type: docker
