@@ -4,6 +4,7 @@ versions:
   - base_version: "3.12"
   - base_version: "3.13-slim-bullseye"
   - base_version: "3.12.3"
+  - base_version: "3.13.5-bookworm"
 watch:
   - pattern: ^\d+\.\d+$
     source: docker.io/library/python
@@ -14,6 +15,10 @@ watch:
     target: base_version
     type: docker
   - pattern: ^\d+\.\d+\.\d+$
+    source: docker.io/library/python
+    target: base_version
+    type: docker
+  - pattern: ^\d+\.\d+\.\d+-bookworm$
     source: docker.io/library/python
     target: base_version
     type: docker
