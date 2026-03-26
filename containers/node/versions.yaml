@@ -6,6 +6,7 @@ versions:
   - base_version: "22-bullseye"
   - base_version: "18-buster"
   - base_version: "20-bullseye-slim"
+  - base_version: "22"
 watch:
   - pattern: ^(\d+)-alpine$
     source: docker.io/library/node
