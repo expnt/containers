@@ -10,6 +10,7 @@ Aliased container image for Python.
 | -------------------- | ------------------ |
 | `3.12`               | 3.12               |
 | `3.13-slim-bullseye` | 3.13-slim-bullseye |
+| `3.13.5-bookworm`    | 3.13.5-bookworm    |
 
 <!-- VERSIONS_END -->
 
