@@ -13,6 +13,7 @@ Aliased container image for Python.
 | `3.12.3`             | 3.12.3             |
 | `3.13.5-bookworm`    | 3.13.5-bookworm    |
 | `3.9-slim`           | 3.9-slim           |
+| `3.11-slim`          | 3.11-slim          |
 
 <!-- VERSIONS_END -->
 
