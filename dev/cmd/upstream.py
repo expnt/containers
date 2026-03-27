@@ -22,7 +22,7 @@ def check_upstream(container: Optional[str], hours: int, json_output: bool) -> N
         data = load_versions(c)
         container_updates = []
         for watch in data.get("watch", []):
-            current_val = str(data["versions"][0].get(watch["target"]))
+            current_vals = [str(v.get(watch["target"])) for v in data["versions"] if watch["target"] in v]
             discovered = []
             if watch["type"] == "docker":
                 if watch["source"].startswith("ghcr.io/"):
@@ -38,19 +38,19 @@ def check_upstream(container: Optional[str], hours: int, json_output: bool) -> N
                     watch["source"], watch["pattern"], hours=hours
                 )
 
-            new_versions = [v for v in discovered if v != current_val]
+            new_versions = [v for v in discovered if v not in current_vals]
             if new_versions:
                 container_updates.append(
                     {"target": watch["target"], "version": new_versions[0]}
                 )
                 if not json_output:
                     console.print(
-                        f"[yellow]Updates available for {c} ({watch['target']}): {current_val} -> {', '.join(new_versions)}[/yellow]"
+                        f"[yellow]Updates available for {c} ({watch['target']}): {current_vals} -> {', '.join(new_versions)}[/yellow]"
                     )
             elif not json_output:
                 if discovered:
                     console.print(
-                        f"[green]{c} ({watch['target']}) is up to date (current: {current_val})[/green]"
+                        f"[green]{c} ({watch['target']}) is up to date (current: {current_vals})[/green]"
                     )
                 else:
                     console.print(
