@@ -1,0 +1,9 @@
+image_name: odoo
+tag_pattern: "{base_version}"
+versions:
+  - base_version: "18.0.20250705-debian-12-r0"
+watch:
+  - pattern: ^\d+\.\d+\.\d+-debian-\d+-r\d+$
+    source: docker.io/bitnamilegacy/odoo
+    target: base_version
+    type: docker

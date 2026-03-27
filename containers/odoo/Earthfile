@@ -1,0 +1,22 @@
+VERSION 0.8
+IMPORT .. AS common
+
+ARG --global BASE_VERSION
+ARG --global TAG
+ARG --global GITHUB_REPOSITORY_OWNER
+
+odoo-base:
+    FROM docker.io/bitnamilegacy/odoo:${BASE_VERSION}
+    DO common+ADD_LABELS
+
+validate:
+    FROM +odoo-base
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+
+build:
+    BUILD +validate
+    FROM +odoo-base
+    DO common+SAVE_IMAGE --IMAGE_NAME=odoo --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+
+build-multiplatform:
+    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./odoo+build
