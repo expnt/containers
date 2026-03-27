@@ -6,18 +6,18 @@ ARG --global PLUGIN_VERSION
 ARG --global TAG
 ARG --global GITHUB_REPOSITORY_OWNER
 
-timescaledb-base:
+cnpg-gis-ts-base:
     FROM ghcr.io/cloudnative-pg/postgresql:$BASE_VERSION
     DO common+ADD_LABELS
 
 validate:
-    FROM +timescaledb-base
+    FROM +cnpg-gis-ts-base
     RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
     RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
 
 build:
     BUILD +validate
-    FROM +timescaledb-base
+    FROM +cnpg-gis-ts-base
     USER root
     RUN set -eux && \
         apt-get update && \
@@ -44,7 +44,13 @@ build:
         find /usr -name "*.la" -delete
     USER postgres
     EXPOSE 5432
-    DO common+SAVE_IMAGE --IMAGE_NAME=timescaledb --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+    DO common+SAVE_IMAGE --IMAGE_NAME=cnpg-gis-ts --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+
+test:
+    FROM +build
+    RUN test -f "/usr/share/postgresql/${BASE_VERSION}/extension/timescaledb.control" || (echo "Error: timescaledb extension missing!" && exit 1)
+    RUN test -f "/usr/share/postgresql/${BASE_VERSION}/extension/postgis.control" || (echo "Error: postgis extension missing!" && exit 1)
+    RUN echo "All plugin validations passed successfully!"
 
 build-multiplatform:
-    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./timescaledb+build
+    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./cnpg-gis-ts+build

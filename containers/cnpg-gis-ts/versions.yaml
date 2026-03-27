@@ -1,4 +1,4 @@
-image_name: timescaledb
+image_name: cnpg-gis-ts
 tag_pattern: "{base_version}-plugin-v{plugin_version}"
 versions:
   - base_version: "17"
