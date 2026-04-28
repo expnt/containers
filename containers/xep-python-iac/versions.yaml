@@ -1,29 +1,29 @@
 image_name: xep-python-iac
-tag_pattern: "{base_version}-bookworm"
+tag_pattern: '{base_version}-bookworm'
 versions:
-  - base_version: "3.12"
-    opentofu_version: 1.8.8
-    poetry_version: 1.8.5
-    precommit_version: 4.0.1
-    tflint_version: 0.54.0
+- base_version: '3.12'
+  opentofu_version: 1.8.8
+  poetry_version: 2.3.4
+  precommit_version: 4.6.0
+  tflint_version: 0.62.0
 watch:
-  - pattern: ^3\.(1[2-9]|[2-9]\d)-bookworm$
-    source: docker.io/library/python
-    target: base_version
-    type: docker
-  - pattern: ^\d+\.\d+\.\d+$
-    source: python-poetry/poetry
-    target: poetry_version
-    type: github
-  - pattern: ^v\d+\.\d+\.\d+$
-    source: pre-commit/pre-commit
-    target: precommit_version
-    type: github
-  - pattern: ^v\d+\.\d+\.\d+$
-    source: opentofu/opentofu
-    target: opentofu_version
-    type: github
-  - pattern: ^v\d+\.\d+\.\d+$
-    source: terraform-linters/tflint
-    target: tflint_version
-    type: github
+- pattern: ^3\.(1[2-9]|[2-9]\d)-bookworm$
+  source: docker.io/library/python
+  target: base_version
+  type: docker
+- pattern: ^\d+\.\d+\.\d+$
+  source: python-poetry/poetry
+  target: poetry_version
+  type: github
+- pattern: ^v\d+\.\d+\.\d+$
+  source: pre-commit/pre-commit
+  target: precommit_version
+  type: github
+- pattern: ^v\d+\.\d+\.\d+$
+  source: opentofu/opentofu
+  target: opentofu_version
+  type: github
+- pattern: ^v\d+\.\d+\.\d+$
+  source: terraform-linters/tflint
+  target: tflint_version
+  type: github
