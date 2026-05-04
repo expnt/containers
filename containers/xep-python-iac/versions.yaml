@@ -3,7 +3,7 @@ tag_pattern: '{base_version}-bookworm'
 versions:
 - base_version: '3.12'
   opentofu_version: 1.11.6
-  poetry_version: 2.3.4
+  poetry_version: 2.4.0
   precommit_version: 4.6.0
   tflint_version: 0.62.0
 watch:
