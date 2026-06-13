@@ -2,7 +2,7 @@ image_name: xep-python-iac
 tag_pattern: '{base_version}-bookworm'
 versions:
 - base_version: '3.12'
-  opentofu_version: 1.11.6
+  opentofu_version: 1.12.2
   poetry_version: 2.4.1
   precommit_version: 4.6.0
   tflint_version: 0.62.0
