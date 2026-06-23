@@ -26,12 +26,19 @@ build:
         curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor -o /etc/apt/trusted.gpg.d/timescale.gpg && \
         apt-get update && \
         DEBIAN_VERSION="$(grep -oP '(?<=VERSION_ID=")[^"]+' /etc/os-release)" && \
+        PACKAGE_NAME="timescaledb-2-postgresql-${BASE_VERSION}" && \
         PG_VERSION_SUFFIX="$(dpkg-query -W -f='${Version}' "postgresql-${BASE_VERSION}" | awk -F'[.-]' '{ printf "%d%02d", $1, $2 }')" && \
-        PACKAGE_VERSION="${PLUGIN_VERSION}~debian${DEBIAN_VERSION}-${PG_VERSION_SUFFIX}" && \
-        if ! apt-cache madison "timescaledb-2-postgresql-${BASE_VERSION}" | awk '{ print $3 }' | grep -Fxq "${PACKAGE_VERSION}"; then \
-            PACKAGE_VERSION="${PLUGIN_VERSION}~debian${DEBIAN_VERSION}"; \
+        EXACT_PACKAGE_VERSION="${PLUGIN_VERSION}~debian${DEBIAN_VERSION}-${PG_VERSION_SUFFIX}" && \
+        LEGACY_PACKAGE_VERSION="${PLUGIN_VERSION}~debian${DEBIAN_VERSION}" && \
+        PACKAGE_VERSION="$(apt-cache madison "${PACKAGE_NAME}" | awk '{ print $3 }' | grep -Fx "${EXACT_PACKAGE_VERSION}" || true)" && \
+        if [ -z "$PACKAGE_VERSION" ]; then \
+            PACKAGE_VERSION="$(apt-cache madison "${PACKAGE_NAME}" | awk -v prefix="${PLUGIN_VERSION}~debian${DEBIAN_VERSION}-" 'index($3, prefix) == 1 { print $3 }' | sort -V | tail -n 1 || true)"; \
         fi && \
-        apt-get install -y --no-install-recommends "timescaledb-2-postgresql-${BASE_VERSION}=${PACKAGE_VERSION}" && \
+        if [ -z "$PACKAGE_VERSION" ] && apt-cache madison "${PACKAGE_NAME}" | awk '{ print $3 }' | grep -Fxq "${LEGACY_PACKAGE_VERSION}"; then \
+            PACKAGE_VERSION="${LEGACY_PACKAGE_VERSION}"; \
+        fi && \
+        test -n "$PACKAGE_VERSION" || (echo "No ${PACKAGE_NAME} package found for ${PLUGIN_VERSION} on debian${DEBIAN_VERSION}" && apt-cache madison "${PACKAGE_NAME}" && exit 1) && \
+        apt-get install -y --no-install-recommends "${PACKAGE_NAME}=${PACKAGE_VERSION}" && \
         apt-get purge -y curl gnupg lsb-release && \
         apt-get clean && \
         apt-get autoremove -y && \
