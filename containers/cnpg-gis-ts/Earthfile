@@ -7,7 +7,7 @@ ARG --global TAG
 ARG --global GITHUB_REPOSITORY_OWNER
 
 cnpg-gis-ts-base:
-    FROM ghcr.io/cloudnative-pg/postgresql:$BASE_VERSION
+    FROM ghcr.io/cloudnative-pg/postgresql:$BASE_VERSION-bookworm
     DO common+ADD_LABELS
 
 validate:
@@ -22,6 +22,7 @@ build:
     RUN set -eux && \
         apt-get update && \
         apt-get install -y --no-install-recommends curl ca-certificates gnupg lsb-release && \
+        apt-get install -y --no-install-recommends "postgresql-${BASE_VERSION}" && \
         echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(lsb_release -c -s) main" > /etc/apt/sources.list.d/timescaledb.list && \
         curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor -o /etc/apt/trusted.gpg.d/timescale.gpg && \
         apt-get update && \
