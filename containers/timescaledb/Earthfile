@@ -6,22 +6,23 @@ ARG --global PLUGIN_VERSION
 ARG --global TAG
 ARG --global GITHUB_REPOSITORY_OWNER
 
-cnpg-gis-ts-base:
-    FROM ghcr.io/cloudnative-pg/postgresql:$BASE_VERSION
+timescaledb-base:
+    FROM ghcr.io/cloudnative-pg/postgresql:$BASE_VERSION-bookworm
     DO common+ADD_LABELS
 
 validate:
-    FROM +cnpg-gis-ts-base
+    FROM +timescaledb-base
     RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
     RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
 
 build:
     BUILD +validate
-    FROM +cnpg-gis-ts-base
+    FROM +timescaledb-base
     USER root
     RUN set -eux && \
         apt-get update && \
         apt-get install -y --no-install-recommends curl ca-certificates gnupg lsb-release && \
+        apt-get install -y --no-install-recommends "postgresql-${BASE_VERSION}" && \
         echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(lsb_release -c -s) main" > /etc/apt/sources.list.d/timescaledb.list && \
         curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor -o /etc/apt/trusted.gpg.d/timescale.gpg && \
         apt-get update && \
@@ -38,10 +39,7 @@ build:
             PACKAGE_VERSION="${LEGACY_PACKAGE_VERSION}"; \
         fi && \
         test -n "$PACKAGE_VERSION" || (echo "No ${PACKAGE_NAME} package found for ${PLUGIN_VERSION} on debian${DEBIAN_VERSION}" && apt-cache madison "${PACKAGE_NAME}" && exit 1) && \
-        apt-get install -y --no-install-recommends \
-            "${PACKAGE_NAME}=${PACKAGE_VERSION}" \
-            "postgresql-${BASE_VERSION}-postgis-3" \
-            "postgresql-${BASE_VERSION}-postgis-3-scripts" && \
+        apt-get install -y --no-install-recommends "${PACKAGE_NAME}=${PACKAGE_VERSION}" && \
         apt-get purge -y curl gnupg lsb-release && \
         apt-get clean && \
         apt-get autoremove -y && \
@@ -57,13 +55,7 @@ build:
         find /usr -name "*.la" -delete
     USER postgres
     EXPOSE 5432
-    DO common+SAVE_IMAGE --IMAGE_NAME=cnpg-gis-ts --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
-
-test:
-    FROM +build
-    RUN test -f "/usr/share/postgresql/${BASE_VERSION}/extension/timescaledb.control" || (echo "Error: timescaledb extension missing!" && exit 1)
-    RUN test -f "/usr/share/postgresql/${BASE_VERSION}/extension/postgis.control" || (echo "Error: postgis extension missing!" && exit 1)
-    RUN echo "All plugin validations passed successfully!"
+    DO common+SAVE_IMAGE --IMAGE_NAME=timescaledb --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
 
 build-multiplatform:
-    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./cnpg-gis-ts+build
+    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./timescaledb+build

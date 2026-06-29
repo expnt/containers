@@ -22,7 +22,11 @@ def check_upstream(container: Optional[str], hours: int, json_output: bool) -> N
         data = load_versions(c)
         container_updates = []
         for watch in data.get("watch", []):
-            current_vals = [str(v.get(watch["target"])) for v in data["versions"] if watch["target"] in v]
+            current_vals = [
+                str(version.get(watch["target"]))
+                for version in data["versions"]
+                if watch["target"] in version
+            ]
             discovered = []
             if watch["type"] == "docker":
                 if watch["source"].startswith("ghcr.io/"):
@@ -85,4 +89,3 @@ def update_version(container: str, target: str, new_version: str) -> None:
         yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
     console.print(f"[green]Updated {container} {target} to {new_version}[/green]")
-

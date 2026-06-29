@@ -4,13 +4,19 @@
 
 <!-- VERSIONS_START -->
 
+- [buildkit](./containers/buildkit/README.md) - `ghcr.io/expnt/containers/buildkit`
+- [deno](./containers/deno/README.md) - `ghcr.io/expnt/containers/deno`
 - [docker](./containers/docker/README.md) - `ghcr.io/expnt/containers/docker`
 - [minio](./containers/minio/README.md) - `ghcr.io/expnt/containers/minio`
 - [node](./containers/node/README.md) - `ghcr.io/expnt/containers/node`
-- [xep-python-iac](./containers/xep-python-iac/README.md) - `ghcr.io/expnt/containers/xep-python-iac`
+- [odoo](./containers/odoo/README.md) - `ghcr.io/expnt/containers/odoo`
+- [php](./containers/php/README.md) - `ghcr.io/expnt/containers/php`
+- [python](./containers/python/README.md) - `ghcr.io/expnt/containers/python`
+- [qemu-user-static](./containers/qemu-user-static/README.md) - `ghcr.io/expnt/containers/qemu-user-static`
 - [redis](./containers/redis/README.md) - `ghcr.io/expnt/containers/redis`
 - [supabase](./containers/supabase/README.md) - `ghcr.io/expnt/containers/supabase`
 - [timescaledb](./containers/timescaledb/README.md) - `ghcr.io/expnt/containers/timescaledb`
+- [xep-python-iac](./containers/xep-python-iac/README.md) - `ghcr.io/expnt/containers/xep-python-iac`
 
 <!-- VERSIONS_END -->
 

@@ -52,7 +52,8 @@ jobs:
       - name: Install Earthly
         uses: earthly/actions-setup@v1
         with:
-          version: latest
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version: 0.8.16
 
       - name: Build ${{ matrix.container }}:${{ matrix.tag }}
         run: poetry run containers build ${{ matrix.container }} --version ${{ matrix.version }}
