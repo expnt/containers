@@ -2,12 +2,15 @@ import click
 import os
 import subprocess
 import sys
+import time
 from typing import Optional
 from rich.console import Console
 from ..utils import get_containers, load_versions, compute_tag, get_default_repo_owner
 
 
 console = Console()
+
+PUSH_ATTEMPTS = 3
 
 
 @click.command()
@@ -84,7 +87,22 @@ def build(
                 cmd.append(f"./containers/{c}{target}")
 
                 console.print(f"[dim]Running: {' '.join(cmd)}[/dim]")
-                subprocess.run(cmd, check=True)
+                attempts = PUSH_ATTEMPTS if push else 1
+                for attempt in range(1, attempts + 1):
+                    try:
+                        subprocess.run(cmd, check=True)
+                        break
+                    except subprocess.CalledProcessError:
+                        if attempt == attempts:
+                            raise
+
+                        wait_seconds = 30 * attempt
+                        console.print(
+                            f"[yellow]Build failed on attempt {attempt}/{attempts}; "
+                            f"retrying in {wait_seconds}s[/yellow]"
+                        )
+                        time.sleep(wait_seconds)
+
                 console.print(
                     f"[bold green]Successfully built {image_name}:{tag}[/bold green]"
                 )
