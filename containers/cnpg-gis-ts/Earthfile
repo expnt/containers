@@ -1,0 +1,69 @@
+VERSION 0.8
+IMPORT .. AS common
+
+ARG --global BASE_VERSION
+ARG --global PLUGIN_VERSION
+ARG --global TAG
+ARG --global GITHUB_REPOSITORY_OWNER
+
+cnpg-gis-ts-base:
+    FROM ghcr.io/cloudnative-pg/postgresql:$BASE_VERSION
+    DO common+ADD_LABELS
+
+validate:
+    FROM +cnpg-gis-ts-base
+    RUN --no-cache test -n "$BASE_VERSION" || (echo "BASE_VERSION is required" && exit 1)
+    RUN --no-cache test -n "$PLUGIN_VERSION" || (echo "PLUGIN_VERSION is required" && exit 1)
+
+build:
+    BUILD +validate
+    FROM +cnpg-gis-ts-base
+    USER root
+    RUN set -eux && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends curl ca-certificates gnupg lsb-release && \
+        echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(lsb_release -c -s) main" > /etc/apt/sources.list.d/timescaledb.list && \
+        curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor -o /etc/apt/trusted.gpg.d/timescale.gpg && \
+        apt-get update && \
+        DEBIAN_VERSION="$(grep -oP '(?<=VERSION_ID=")[^"]+' /etc/os-release)" && \
+        PACKAGE_NAME="timescaledb-2-postgresql-${BASE_VERSION}" && \
+        PG_VERSION_SUFFIX="$(dpkg-query -W -f='${Version}' "postgresql-${BASE_VERSION}" | awk -F'[.-]' '{ printf "%d%02d", $1, $2 }')" && \
+        EXACT_PACKAGE_VERSION="${PLUGIN_VERSION}~debian${DEBIAN_VERSION}-${PG_VERSION_SUFFIX}" && \
+        LEGACY_PACKAGE_VERSION="${PLUGIN_VERSION}~debian${DEBIAN_VERSION}" && \
+        PACKAGE_VERSION="$(apt-cache madison "${PACKAGE_NAME}" | awk '{ print $3 }' | grep -Fx "${EXACT_PACKAGE_VERSION}" || true)" && \
+        if [ -z "$PACKAGE_VERSION" ]; then \
+            PACKAGE_VERSION="$(apt-cache madison "${PACKAGE_NAME}" | awk -v prefix="${PLUGIN_VERSION}~debian${DEBIAN_VERSION}-" 'index($3, prefix) == 1 { print $3 }' | sort -V | tail -n 1 || true)"; \
+        fi && \
+        if [ -z "$PACKAGE_VERSION" ] && apt-cache madison "${PACKAGE_NAME}" | awk '{ print $3 }' | grep -Fxq "${LEGACY_PACKAGE_VERSION}"; then \
+            PACKAGE_VERSION="${LEGACY_PACKAGE_VERSION}"; \
+        fi && \
+        test -n "$PACKAGE_VERSION" || (echo "No ${PACKAGE_NAME} package found for ${PLUGIN_VERSION} on debian${DEBIAN_VERSION}" && apt-cache madison "${PACKAGE_NAME}" && exit 1) && \
+        apt-get install -y --no-install-recommends \
+            "${PACKAGE_NAME}=${PACKAGE_VERSION}" \
+            "postgresql-${BASE_VERSION}-postgis-3" \
+            "postgresql-${BASE_VERSION}-postgis-3-scripts" && \
+        apt-get purge -y curl gnupg lsb-release && \
+        apt-get clean && \
+        apt-get autoremove -y && \
+        rm -rf /etc/apt/sources.list.d/timescaledb.list /etc/apt/trusted.gpg.d/timescale.gpg \
+               /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/apt/* \
+               /usr/share/doc/* /usr/share/man/* /usr/share/info/* \
+               /usr/share/i18n/locales/* /usr/share/locale/* && \
+        find /usr/share/i18n -type f ! -name "POSIX" -delete && \
+        mkdir -p /etc/postgresql-custom /var/run/postgresql && \
+        chmod 777 /var/run/postgresql && \
+        chmod 777 /etc/postgresql-custom && \
+        find /usr -name "*.a" -delete && \
+        find /usr -name "*.la" -delete
+    USER postgres
+    EXPOSE 5432
+    DO common+SAVE_IMAGE --IMAGE_NAME=cnpg-gis-ts --TAG=${TAG} --GITHUB_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER}
+
+test:
+    FROM +build
+    RUN test -f "/usr/share/postgresql/${BASE_VERSION}/extension/timescaledb.control" || (echo "Error: timescaledb extension missing!" && exit 1)
+    RUN test -f "/usr/share/postgresql/${BASE_VERSION}/extension/postgis.control" || (echo "Error: postgis extension missing!" && exit 1)
+    RUN echo "All plugin validations passed successfully!"
+
+build-multiplatform:
+    DO --pass-args common+BUILD_MULTIPLATFORM --TARGET=./cnpg-gis-ts+build
