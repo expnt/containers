@@ -2,7 +2,7 @@ image_name: timescaledb
 tag_pattern: '{base_version}-plugin-v{plugin_version}'
 versions:
 - base_version: '17'
-  plugin_version: 2.28.1
+  plugin_version: 2.28.2
 watch:
 - pattern: ^(16|17)$
   source: ghcr.io/cloudnative-pg/postgresql
