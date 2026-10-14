@@ -4,7 +4,7 @@ versions:
 - base_version: '3.12'
   opentofu_version: 1.12.3
   poetry_version: 2.4.1
-  precommit_version: 4.6.0
+  precommit_version: 4.7.0
   tflint_version: 0.63.1
 watch:
 - pattern: ^3\.(1[2-9]|[2-9]\d)-bookworm$
