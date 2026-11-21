@@ -5,6 +5,7 @@
 <!-- VERSIONS_START -->
 
 - [buildkit](./containers/buildkit/README.md) - `ghcr.io/expnt/containers/buildkit`
+- [cnpg-gis-ts](./containers/cnpg-gis-ts/README.md) - `ghcr.io/expnt/containers/cnpg-gis-ts`
 - [deno](./containers/deno/README.md) - `ghcr.io/expnt/containers/deno`
 - [docker](./containers/docker/README.md) - `ghcr.io/expnt/containers/docker`
 - [minio](./containers/minio/README.md) - `ghcr.io/expnt/containers/minio`
